@@ -343,12 +343,13 @@ class HybridDetector:
 _hybrid_detector: Optional[HybridDetector] = None
 
 
-def get_hybrid_detector(enable_sam: bool = True) -> HybridDetector:
+def get_hybrid_detector(enable_sam: Optional[bool] = None) -> HybridDetector:
     """
     Get or create the global hybrid detector instance.
     
     Args:
-        enable_sam: Whether to enable SAM verification
+        enable_sam: Whether to enable SAM verification. 
+                    If None, uses settings.sam_enabled
         
     Returns:
         HybridDetector instance
@@ -356,6 +357,8 @@ def get_hybrid_detector(enable_sam: bool = True) -> HybridDetector:
     global _hybrid_detector
     
     if _hybrid_detector is None:
-        _hybrid_detector = HybridDetector(enable_sam=enable_sam)
+        # Use settings.sam_enabled if not explicitly specified
+        sam_enabled = enable_sam if enable_sam is not None else settings.sam_enabled
+        _hybrid_detector = HybridDetector(enable_sam=sam_enabled)
     
     return _hybrid_detector

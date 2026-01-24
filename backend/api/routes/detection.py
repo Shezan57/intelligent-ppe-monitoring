@@ -18,6 +18,7 @@ from api.models.response_models import DetectionResponse, PersonDetection, Timin
 from services.hybrid_detector import get_hybrid_detector
 from database.connection import get_db
 from config.settings import settings
+from agents.violation_collector import ViolationCollector
 
 
 router = APIRouter(prefix="/api", tags=["detection"])
@@ -133,6 +134,24 @@ async def detect_violations(
         bypass_rate=result["stats"]["bypass_rate"]
     )
     
+    # === Store violations in database ===
+    try:
+        collector = ViolationCollector(
+            db=db,
+            site_location=site_location or settings.default_site_location,
+            camera_id=camera_id or settings.default_camera_id
+        )
+        collector.store_detection_results(
+            detection_result=result,
+            image_path=original_path,
+            annotated_path=annotated_path,
+            site_location=site_location,
+            camera_id=camera_id
+        )
+    except Exception as e:
+        # Log but don't fail detection if storage fails
+        print(f"⚠️ Warning: Failed to store violations: {e}")
+    
     return DetectionResponse(
         success=True,
         message="Detection completed successfully",
@@ -211,6 +230,23 @@ async def detect_from_base64(
         })
         for p in result["persons"]
     ]
+    
+    # Store violations in database
+    try:
+        collector = ViolationCollector(
+            db=db,
+            site_location=site_location or settings.default_site_location,
+            camera_id=camera_id or settings.default_camera_id
+        )
+        collector.store_detection_results(
+            detection_result=result,
+            image_path=original_path,
+            annotated_path=annotated_path,
+            site_location=site_location,
+            camera_id=camera_id
+        )
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to store violations: {e}")
     
     return DetectionResponse(
         success=True,

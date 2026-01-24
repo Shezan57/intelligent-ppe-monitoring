@@ -3,7 +3,7 @@
  * Application header with logo and navigation
  */
 
-const Header = () => {
+const Header = ({ onSettingsClick }) => {
     return (
         <header className="header">
             <div className="header__logo">
@@ -31,9 +31,17 @@ const Header = () => {
                 }}>
                     🎓 Master's Thesis Project
                 </span>
+                <button
+                    className="btn btn--secondary"
+                    onClick={onSettingsClick}
+                    style={{ marginLeft: '0.5rem' }}
+                >
+                    ⚙️ Settings
+                </button>
             </nav>
         </header>
     )
 }
 
 export default Header
+

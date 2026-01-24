@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     )
     
     # ===== SAM Model =====
+    sam_enabled: bool = Field(
+        default=False,
+        description="Enable SAM verification (requires GPU). Set to False for YOLO-only mode."
+    )
     sam_model_path: str = Field(
         default="./models/sam3.pt",
         description="Path to SAM model weights"

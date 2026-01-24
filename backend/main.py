@@ -25,7 +25,7 @@ from fastapi.responses import JSONResponse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config.settings import settings
-from api.routes import detection_router, upload_router, history_router
+from api.routes import detection_router, upload_router, history_router, video_router
 from database.connection import engine
 from database.models import create_tables
 
@@ -166,6 +166,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(detection_router)
 app.include_router(upload_router)
 app.include_router(history_router)
+app.include_router(video_router)
 
 
 # === Static Files ===
