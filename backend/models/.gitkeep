@@ -1,0 +1,3 @@
+# Placeholder for model weights
+# Place your trained YOLO weights here: yolov11m_best.pt
+# Place SAM weights here: sam3.pt

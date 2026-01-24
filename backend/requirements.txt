@@ -1,0 +1,41 @@
+# PPE Detection Backend - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# ===== Core ML =====
+ultralytics>=8.0.0          # YOLOv11
+torch>=2.0.0                # PyTorch
+torchvision>=0.15.0         # Vision utilities
+# SAM - install separately: pip install git+https://github.com/facebookresearch/segment-anything.git
+
+# ===== API Framework =====
+fastapi>=0.104.0            # Async REST API
+uvicorn[standard]>=0.24.0   # ASGI server
+python-multipart>=0.0.6     # File uploads
+
+# ===== Database =====
+sqlalchemy>=2.0.0           # ORM
+psycopg2-binary>=2.9.0      # PostgreSQL driver
+alembic>=1.12.0             # Database migrations
+
+# ===== PDF & Reporting =====
+reportlab>=4.0.0            # PDF generation
+matplotlib>=3.7.0           # Charts
+seaborn>=0.12.0             # Statistical plots
+
+# ===== Image Processing =====
+opencv-python-headless>=4.8.0  # OpenCV (no GUI)
+Pillow>=10.0.0              # Image handling
+numpy>=1.24.0               # Arrays
+
+# ===== Configuration =====
+pydantic>=2.0.0             # Data validation
+pydantic-settings>=2.0.0    # Settings management
+python-dotenv>=1.0.0        # Environment variables
+
+# ===== Background Tasks =====
+apscheduler>=3.10.0         # Task scheduling
+
+# ===== Testing =====
+pytest>=7.4.0               # Testing framework
+pytest-asyncio>=0.21.0      # Async test support
+httpx>=0.25.0               # Async HTTP client for tests
