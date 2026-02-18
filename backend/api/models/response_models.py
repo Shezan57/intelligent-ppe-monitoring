@@ -124,7 +124,11 @@ class DetectionResponse(BaseModel):
 
 class ViolationResponse(BaseModel):
     """
-    Violation record from database.
+    Violation session record from database.
+
+    Each row = 1 violation SESSION (not 1 detection).
+    A session starts when a worker first violates and is updated
+    every cooldown cycle until they become compliant or leave.
     """
     id: int
     timestamp: datetime
@@ -140,6 +144,12 @@ class ViolationResponse(BaseModel):
     original_image_path: Optional[str]
     annotated_image_path: Optional[str]
     report_sent: bool
+    # Session tracking fields
+    session_start: Optional[datetime] = None
+    last_seen: Optional[datetime] = None
+    occurrence_count: int = 1
+    total_duration_minutes: float = 0.0
+    is_active_session: bool = True
 
 
 class HistoryResponse(BaseModel):

@@ -175,30 +175,57 @@ class DailyReporter:
             db.close()
     
     def _calculate_stats(self, violations: List[Violation]) -> Dict[str, Any]:
-        """Calculate report statistics."""
-        total = len(violations)
-        
+        """Calculate session-based report statistics."""
+        total_sessions = len(violations)  # 1 row = 1 session (not 1 detection!)
+
         no_helmet = sum(1 for v in violations if v.violation_type == "no_helmet")
         no_vest = sum(1 for v in violations if v.violation_type == "no_vest")
         both_missing = sum(1 for v in violations if v.violation_type == "both_missing")
-        
-        # Count compliant (those with both PPE items)
+
+        # Count compliant sessions
         compliant = sum(1 for v in violations if v.has_helmet and v.has_vest)
-        total_violations = total - compliant
-        
-        compliance_rate = (compliant / total * 100) if total > 0 else 100.0
-        
+        total_violations = total_sessions - compliant
+
+        compliance_rate = (compliant / total_sessions * 100) if total_sessions > 0 else 100.0
+
         # SAM activation stats
         sam_activations = sum(1 for v in violations if v.sam_activated)
-        
+
+        # === Session-based metrics (thesis contribution) ===
+        # Total re-detections across all sessions
+        total_occurrences = sum(
+            (v.occurrence_count or 1) for v in violations
+        )
+        # Total violation time across all sessions
+        total_duration_minutes = sum(
+            (v.total_duration_minutes or 0.0) for v in violations
+        )
+        # Average session duration
+        avg_duration_minutes = (
+            total_duration_minutes / total_violations
+            if total_violations > 0 else 0.0
+        )
+        # Longest single violation session
+        longest_session_minutes = max(
+            (v.total_duration_minutes or 0.0) for v in violations
+        ) if violations else 0.0
+
         return {
-            "total_detections": total,
+            # Basic counts
+            "total_sessions": total_sessions,
+            "total_detections": total_sessions,       # kept for compatibility
             "total_violations": total_violations,
             "compliance_rate": compliance_rate,
             "no_helmet_count": no_helmet,
             "no_vest_count": no_vest,
             "both_missing_count": both_missing,
-            "sam_activations": sam_activations
+            "sam_activations": sam_activations,
+            # Session-based metrics
+            "total_occurrences": total_occurrences,
+            "total_duration_minutes": round(total_duration_minutes, 1),
+            "total_duration_hours": round(total_duration_minutes / 60, 2),
+            "avg_session_duration_minutes": round(avg_duration_minutes, 1),
+            "longest_session_minutes": round(longest_session_minutes, 1),
         }
     
     def _generate_pdf(

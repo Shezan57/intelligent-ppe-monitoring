@@ -98,9 +98,34 @@ class StreamProcessor:
         # Setup output video writer
         out = None
         if output_path:
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            # Use XVID codec which is more browser-compatible
+            # Try multiple codecs for cross-platform support
+            codecs_to_try = [
+                ('XVID', '.avi'),   # Most compatible
+                ('MJPG', '.avi'),   # Motion JPEG fallback
+                ('mp4v', '.mp4'),   # Last resort
+            ]
+            
             out_fps = fps / self.frame_skip  # Reduced FPS for output
-            out = cv2.VideoWriter(output_path, fourcc, out_fps, (width, height))
+            
+            for codec, ext in codecs_to_try:
+                try:
+                    fourcc = cv2.VideoWriter_fourcc(*codec)
+                    # Update output path extension
+                    test_path = os.path.splitext(output_path)[0] + ext
+                    out = cv2.VideoWriter(test_path, fourcc, out_fps, (width, height))
+                    if out.isOpened():
+                        output_path = test_path  # Update to working path
+                        break
+                    out.release()
+                except:
+                    continue
+            
+            if out is None or not out.isOpened():
+                # Final fallback
+                fourcc = cv2.VideoWriter_fourcc(*'XVID')
+                output_path = os.path.splitext(output_path)[0] + '.avi'
+                out = cv2.VideoWriter(output_path, fourcc, out_fps, (width, height))
         
         # Process frames
         frame_results = []

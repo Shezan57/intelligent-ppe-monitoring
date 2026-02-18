@@ -104,6 +104,206 @@ class HybridDetector:
         self.sam_verifier = sam_verifier or get_sam_verifier()
         self.enable_sam = enable_sam
     
+    def detect_async(
+        self,
+        image: np.ndarray,
+        save_annotated: bool = False,
+        output_path: Optional[str] = None,
+        on_sam_complete: Optional[callable] = None
+    ) -> Dict[str, Any]:
+        """
+        Run hybrid detection with ASYNC SAM verification.
+
+        This is the REAL-TIME pipeline:
+        1. YOLO runs synchronously → instant result returned
+        2. Uncertain paths (2,3,4) submit SAM jobs to background thread
+        3. SAM finishes during the cooldown window → updates DB
+        4. No blocking → full real-time performance
+
+        Args:
+            image: Input image (BGR, H×W×C)
+            save_annotated: Whether to save annotated image
+            output_path: Path for annotated image
+            on_sam_complete: Callback(SAMVerificationResult) for each SAM job
+
+        Returns:
+            Detection result dict with extra fields:
+            - sam_jobs: List of submitted SAM job IDs (check later)
+            - sam_mode: 'async' (SAM running in background)
+        """
+        from services.async_sam_verifier import get_async_sam_verifier
+        async_sam = get_async_sam_verifier()
+
+        total_start = time.time()
+
+        # === Step 1: YOLO Detection (synchronous, fast) ===
+        yolo_start = time.time()
+        yolo_results = self.yolo_detector.detect(image)
+        yolo_time = (time.time() - yolo_start) * 1000
+
+        persons_raw = yolo_results["persons"]
+
+        # === Step 2: Process each person - YOLO paths only, submit SAM async ===
+        sam_start = time.time()
+        persons_processed = []
+        path_counts = {path.value: 0 for path in DecisionPath}
+        sam_activations = 0
+        sam_job_ids = []  # Track submitted async SAM jobs
+
+        for i, person in enumerate(persons_raw):
+            result, path, used_sam, job_id = self._process_person_async(
+                person, image, person_id=i,
+                async_sam=async_sam,
+                on_sam_complete=on_sam_complete
+            )
+            persons_processed.append(result)
+            path_counts[path.value] += 1
+            if used_sam:
+                sam_activations += 1
+            if job_id:
+                sam_job_ids.append(job_id)
+
+        sam_time = (time.time() - sam_start) * 1000
+
+        # === Step 3: Statistics ===
+        total_persons = len(persons_processed)
+        total_violations = sum(1 for p in persons_processed if p.is_violation)
+        compliance_rate = (
+            (total_persons - total_violations) / total_persons * 100
+            if total_persons > 0 else 100.0
+        )
+        bypass_rate = (
+            (total_persons - sam_activations) / total_persons * 100
+            if total_persons > 0 else 100.0
+        )
+
+        postprocess_start = time.time()
+
+        # === Step 4: Annotated image ===
+        annotated_path = None
+        if save_annotated or output_path:
+            detection_result_for_viz = {
+                "persons": [p.to_dict() for p in persons_processed]
+            }
+            annotated_image = draw_detections(image, detection_result_for_viz)
+            if output_path:
+                cv2.imwrite(output_path, annotated_image)
+                annotated_path = output_path
+
+        postprocess_time = (time.time() - postprocess_start) * 1000
+        total_time = (time.time() - total_start) * 1000
+
+        return {
+            "success": True,
+            "message": "Detection completed (SAM verifying in background)",
+            "persons": [p.to_dict() for p in persons_processed],
+            "timing": {
+                "total_ms": total_time,
+                "yolo_ms": yolo_time,
+                "sam_ms": sam_time,   # Near 0 - SAM is async
+                "postprocess_ms": postprocess_time
+            },
+            "stats": {
+                "total_persons": total_persons,
+                "total_violations": total_violations,
+                "compliance_rate": compliance_rate,
+                "sam_activations": sam_activations,
+                "bypass_rate": bypass_rate,
+                "path_distribution": path_counts
+            },
+            "annotated_image_path": annotated_path,
+            # Async SAM info
+            "sam_mode": "async",
+            "sam_jobs": sam_job_ids,
+            "sam_jobs_pending": len(sam_job_ids)
+        }
+
+    def _process_person_async(
+        self,
+        person: Dict[str, Any],
+        image: np.ndarray,
+        person_id: int,
+        async_sam,
+        on_sam_complete: Optional[callable] = None
+    ) -> tuple:
+        """
+        Process a person using YOLO result immediately.
+        For uncertain paths, submit SAM job to background thread.
+
+        Returns:
+            Tuple of (PersonResult, DecisionPath, sam_submitted, job_id)
+        """
+        bbox = person["bbox"]
+        confidence = person["confidence"]
+        helmet_detected = person.get("helmet_detected", False)
+        vest_detected = person.get("vest_detected", False)
+        no_helmet_detected = person.get("no_helmet_detected", False)
+
+        # PATH 0: Fast Safe - both detected, no SAM needed
+        if helmet_detected and vest_detected:
+            result, path, used_sam = self._create_result(
+                person_id, bbox, confidence,
+                has_helmet=True, has_vest=True,
+                path=DecisionPath.FAST_SAFE, sam_used=False
+            )
+            return result, path, used_sam, None
+
+        # PATH 1: Fast Violation - explicit no_helmet class, no SAM needed
+        if no_helmet_detected:
+            result, path, used_sam = self._create_result(
+                person_id, bbox, confidence,
+                has_helmet=False, has_vest=vest_detected,
+                path=DecisionPath.FAST_VIOLATION, sam_used=False
+            )
+            return result, path, used_sam, None
+
+        # === UNCERTAIN PATHS - Submit SAM async ===
+
+        if not self.enable_sam:
+            # SAM disabled - use YOLO best guess
+            result, path, used_sam = self._create_result(
+                person_id, bbox, confidence,
+                has_helmet=helmet_detected, has_vest=vest_detected,
+                path=DecisionPath.FAST_VIOLATION, sam_used=False
+            )
+            return result, path, used_sam, None
+
+        # Determine which path and initial YOLO guess
+        if vest_detected and not helmet_detected:
+            path = DecisionPath.RESCUE_HEAD
+            violation_type = "no_helmet"
+            initial_has_helmet, initial_has_vest = False, True
+        elif helmet_detected and not vest_detected:
+            path = DecisionPath.RESCUE_BODY
+            violation_type = "no_vest"
+            initial_has_helmet, initial_has_vest = True, False
+        else:
+            path = DecisionPath.CRITICAL
+            violation_type = "both_missing"
+            initial_has_helmet, initial_has_vest = False, False
+
+        # Return YOLO's initial guess immediately
+        result, path, _ = self._create_result(
+            person_id, bbox, confidence,
+            has_helmet=initial_has_helmet,
+            has_vest=initial_has_vest,
+            path=path,
+            sam_used=True  # Mark as SAM path (even though async)
+        )
+
+        # Submit SAM job to background thread (non-blocking)
+        yolo_person_dict = result.to_dict()
+        job_id = async_sam.submit(
+            person_id=person_id,
+            bbox=bbox,
+            image=image,
+            violation_type=violation_type,
+            yolo_result=yolo_person_dict,
+            on_complete=on_sam_complete
+        )
+
+        return result, path, True, job_id
+
     def detect(
         self,
         image: np.ndarray,

@@ -80,9 +80,10 @@ async def detect_video(
             output_path=output_path
         )
         
-        # Add paths to result
+        # Add paths to result - use actual output path from processing
         result["input_video_path"] = input_path
-        result["output_video_url"] = f"/uploads/{os.path.basename(output_path)}"
+        actual_output = result.get("output_video_path", output_path)
+        result["output_video_url"] = f"/uploads/{os.path.basename(actual_output)}"
         
         return result
         

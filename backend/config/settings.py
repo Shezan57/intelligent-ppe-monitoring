@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     
     # ===== YOLO Model =====
     yolo_model_path: str = Field(
-        default="./models/yolov11m_best.pt",
+        default="./models/best.pt",
         description="Path to trained YOLOv11m weights"
     )
     yolo_confidence_threshold: float = Field(
@@ -83,6 +83,20 @@ class Settings(BaseSettings):
     report_output_dir: str = Field(
         default="./reports",
         description="Directory for generated PDF reports"
+    )
+    
+    # ===== Violation Tracking =====
+    violation_cooldown_seconds: float = Field(
+        default=300.0,
+        description="Cooldown period (seconds) before re-alerting for same violation. Default 5 minutes."
+    )
+    violation_iou_threshold: float = Field(
+        default=0.3,
+        description="Min IoU to match bounding boxes as same person (0.0-1.0)"
+    )
+    violation_track_timeout: float = Field(
+        default=30.0,
+        description="Remove person tracks not seen for this duration (seconds)"
     )
     
     # ===== Application =====

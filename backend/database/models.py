@@ -54,6 +54,22 @@ class Violation(Base):
     # Reporting
     report_sent = Column(Boolean, default=False)
     report_date = Column(Date, nullable=True)
+
+    # === Session Tracking ===
+    # Instead of creating a new row every 5 minutes for the same worker,
+    # we UPDATE this single row to track the full violation session.
+    #
+    # Example: Worker without helmet for 2 hours:
+    #   - occurrence_count = 24  (re-detected every 5 min)
+    #   - total_duration_minutes = 120
+    #   - session_start = 08:00
+    #   - last_seen = 10:00
+    #   → Report shows 1 row, not 24!
+    session_start = Column(DateTime, nullable=True)          # When violation first started
+    last_seen = Column(DateTime, nullable=True)              # Last time this worker was seen violating
+    occurrence_count = Column(Integer, default=1)            # How many times re-detected in this session
+    total_duration_minutes = Column(Float, default=0.0)      # Total violation duration in minutes
+    is_active_session = Column(Boolean, default=True)        # Is worker still in frame?
     
     # Indexes for efficient queries
     __table_args__ = (

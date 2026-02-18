@@ -8,6 +8,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### 2026-01-28 - Violation De-duplication (Cooldown System)
+
+#### Added
+- **Violation Tracker Service** (`services/violation_tracker.py`)
+  - IoU-based person tracking across frames
+  - Configurable cooldown period (default 5 min)
+  - Prevents repeated alerts for same worker with same violation
+  - Tracks deduplication rate for thesis metrics
+
+- **API Endpoints**
+  - `GET /api/tracking/stats` - Get de-duplication statistics
+  - `POST /api/tracking/reset` - Reset tracking state
+
+- **Config Settings**
+  - `VIOLATION_COOLDOWN_SECONDS` - Cooldown before re-alerting (300s)
+  - `VIOLATION_IOU_THRESHOLD` - Min overlap to match as same person (0.3)
+  - `VIOLATION_TRACK_TIMEOUT` - Remove stale tracks (30s)
+
+#### Changed
+- `ViolationCollector` now uses `ViolationTracker` for automatic de-duplication
+- Detection endpoints automatically skip duplicate violations within cooldown
+
+---
+
+### 2026-01-24 - Core Features Complete (Video, History, Settings)
+
+#### Added
+- **Video Detection System**
+  - `services/stream_processor.py` - Video file processing with frame skipping
+  - `api/routes/video.py` - Video upload and WebSocket webcam endpoints
+  - `POST /api/detect/video` - Process uploaded video files
+  - `WS /api/ws/webcam` - Real-time webcam detection stream
+  
+- **Evaluation Script**
+  - `scripts/evaluate.py` - Run detection on test dataset, generate thesis metrics
+  - Outputs: precision, recall, F1, FPS, SAM activation rate, path distribution
+
+- **Frontend Components**
+  - `components/HistoryTable.jsx` - Violation history with filters and pagination
+  - `components/SettingsPanel.jsx` - Configure detection thresholds
+  - `components/VideoUpload.jsx` - Video file upload with progress
+  - Tabbed navigation: Image Detection | Video Detection | Violation History
+  - Settings button in header
+
+- **CSS Additions**
+  - Navigation tabs, data tables, pagination
+  - Settings modal, toggle switches
+  - Progress bar, result grids
+
+#### Changed
+- `App.jsx` - Refactored with tabbed navigation
+- `Header.jsx` - Added settings button prop
+- Integrated ViolationCollector into detection endpoints
+
+---
+
 ### 2026-01-24 - Backend Core Implementation Complete
 
 #### Added
@@ -41,8 +97,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - 5-Path Decision Logic implemented as specified
 - SAM receives cropped ROI (critical optimization)
 - Mock mode for SAM when running on CPU
+- SAM disabled by default (`sam_enabled = False`) for CPU development
 - Comprehensive type hints and docstrings
-- Total: 25+ Python files created
+- Total: 30+ Python files created
+
+---
+
+### 2026-01-24 - Frontend Implementation Complete
+
+#### Added
+- **React/Vite Setup**
+  - `package.json` with dependencies
+  - `vite.config.js` with API proxy
+- **Design System**
+  - `styles/index.css` - Comprehensive dark theme CSS (900+ lines)
+  - CSS variables for colors, spacing, typography
+- **Components**
+  - `Header.jsx` - Application header with logo
+  - `UploadZone.jsx` - Drag-drop image upload with preview
+  - `DetectionCanvas.jsx` - Image display with annotation toggle
+  - `StatsPanel.jsx` - Detection statistics and timing
+  - `ViolationCard.jsx` - Individual person PPE status
+- **API Client**
+  - `api/client.js` - Axios instance with interceptors
 
 ---
 
@@ -50,65 +127,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 #### Added
 - Initial project repository setup
-- `COMPLETE_PROJECT_SPECIFICATION.md` - Comprehensive technical specification (1942 lines)
-- `ADVANCED_FEATURES_SPECIFICATION.md` - Enterprise-grade feature specifications (907 lines)
-- `CHANGELOG.md` - This file for tracking all project changes
-- `README.md` - Basic project readme
-
-#### Project Specifications Analyzed
-- **Core System Architecture:** Hybrid YOLO + SAM detection with 5-path decision logic
-- **Automated Reporting:** Database storage, PDF generation, email automation
-- **Frontend:** React/Vite with dark theme, upload zone, detection canvas
-- **Deployment:** Docker containerization with GPU support
-- **Advanced Features:** Real-time streaming, multi-channel alerts, predictive analytics
-
-#### Key Technical Details Documented
-- YOLOv11m for object detection
-- SAM3 for semantic verification  
-- 5-path decision logic with 79.8% bypass rate
-- ROI extraction: Head (top 40%), Torso (20%-100%)
-- SGD optimizer (not AdamW) for training
-- PostgreSQL database for violations storage
-- APScheduler for automated daily reporting
+- `COMPLETE_PROJECT_SPECIFICATION.md` - Technical specification (1942 lines)
+- `ADVANCED_FEATURES_SPECIFICATION.md` - Enterprise features (907 lines)
+- `CHANGELOG.md` - This file
+- `README.md` - Basic readme
 
 ---
 
-## Change Log Format
+## Project Status Summary
 
-Each entry should include:
-- **Date** of the change
-- **Category** (Added, Changed, Deprecated, Removed, Fixed, Security)
-- **Description** of what was changed
-- **Files affected** (if applicable)
-- **Breaking changes** (if any)
+### Completed ✅
+- [x] Phase 1: Backend Core (YOLO, SAM, Hybrid Detection)
+- [x] Phase 2: Database & Agents (Violations, Reporting)
+- [x] Phase 3: Frontend (React UI, Components)
+- [x] Phase 4: Integration (Video, History, Settings)
 
----
+### Pending ⏳
+- [ ] Phase 5: Evaluation (run on 141 test images)
+- [ ] Phase 6: Azure GPU Deployment
 
-## Upcoming Changes
-
-### Phase 1: Backend Core (Planned)
-- [ ] Project directory structure setup
-- [ ] Backend dependencies installation
-- [ ] YOLO detector implementation
-- [ ] SAM verifier implementation  
-- [ ] Hybrid detector with 5-path logic
-- [ ] FastAPI routes
-
-### Phase 2: Database & Agents (Planned)
-- [ ] Database models and migrations
-- [ ] Violation collector agent
-- [ ] PDF report generator
-- [ ] Email service
-- [ ] Daily reporter scheduler
-
-### Phase 3: Frontend (Planned)
-- [ ] React/Vite project initialization
-- [ ] Design system and components
-- [ ] API integration
-- [ ] History dashboard
-
-### Phase 4-6: Integration, Evaluation, Deployment (Planned)
-- [ ] End-to-end testing
-- [ ] Performance evaluation
-- [ ] Docker containerization
-- [ ] Demo and documentation
+### Key Metrics (Expected)
+| Metric | Target | Status |
+|--------|--------|--------|
+| Precision | >60% | TBD |
+| FPS | >25 | TBD |
+| SAM Bypass Rate | 79.8% | Implemented |
+| SAM Activation | <25% | Implemented |

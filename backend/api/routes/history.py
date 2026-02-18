@@ -91,7 +91,13 @@ async def get_violation_history(
             processing_time_ms=v.processing_time_ms,
             original_image_path=v.original_image_path,
             annotated_image_path=v.annotated_image_path,
-            report_sent=v.report_sent
+            report_sent=v.report_sent,
+            # Session fields
+            session_start=v.session_start,
+            last_seen=v.last_seen,
+            occurrence_count=v.occurrence_count or 1,
+            total_duration_minutes=v.total_duration_minutes or 0.0,
+            is_active_session=v.is_active_session if v.is_active_session is not None else True
         )
         for v in violations
     ]
