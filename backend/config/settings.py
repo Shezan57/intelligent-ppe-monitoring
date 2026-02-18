@@ -34,6 +34,10 @@ class Settings(BaseSettings):
         default=0.25,
         description="Minimum confidence for YOLO detections"
     )
+    yolo_imgsz: int = Field(
+        default=1280,
+        description="Inference image size — must match training resolution (best.pt trained at 1280)"
+    )
     
     # ===== SAM Model =====
     sam_enabled: bool = Field(

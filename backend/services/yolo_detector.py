@@ -4,11 +4,11 @@ YOLO Detector Service
 YOLOv11m wrapper for PPE detection.
 Handles model loading, inference, and result parsing.
 
-Classes detected:
-- 0: helmet (presence)
-- 2: vest (presence)
-- 6: person (base)
-- 7: no_helmet (absence)
+Classes detected by new best.pt model:
+    0: Helmet    (PPE presence — worker IS wearing helmet)
+    1: Vest      (PPE presence — worker IS wearing vest)
+    2: Person    (base person detection)
+    3: no_helmet (PPE absence  — worker is NOT wearing helmet)
 """
 
 import time
@@ -21,24 +21,24 @@ from ultralytics import YOLO
 from config.settings import settings
 
 
-# Class mapping based on YOUR trained model
+# ── Class mapping for new best.pt model ──────────────────────────────────────
+# New model has 4 classes only (simplified from old 10-class model)
 CLASS_NAMES = {
-    0: "helmet",
-    1: "gloves",
-    2: "vest", 
-    3: "boots",
-    4: "goggles",
-    5: "none",
-    6: "Person",
-    7: "no_helmet",
-    8: "no_goggle",
-    9: "no_gloves"
+    0: "Helmet",      # Worker IS wearing a helmet  (presence)
+    1: "Vest",        # Worker IS wearing a vest    (presence)
+    2: "Person",      # Base person detection
+    3: "no_helmet",   # Worker is NOT wearing helmet (absence — direct violation signal)
 }
 
-# Classes we care about for PPE detection
-PPE_PRESENCE_CLASSES = {"helmet", "vest", "gloves", "boots", "goggles"}
-PPE_ABSENCE_CLASSES = {"no_helmet", "no_goggle", "no_gloves"}
-PERSON_CLASS_ID = 6
+# PPE presence classes: detected when worker HAS the equipment
+PPE_PRESENCE_CLASSES = {"Helmet", "Vest"}
+
+# PPE absence classes: detected when worker is MISSING equipment
+# Note: new model only has no_helmet; vest absence is inferred from Vest not being detected
+PPE_ABSENCE_CLASSES = {"no_helmet"}
+
+# Person class ID in the new model
+PERSON_CLASS_ID = 2
 
 
 class YOLODetector:
@@ -135,10 +135,11 @@ class YOLODetector:
         
         start_time = time.time()
         
-        # Run YOLO inference
+        # Run YOLO inference at training resolution
         results = self.model(
             image,
             conf=self.confidence_threshold,
+            imgsz=settings.yolo_imgsz,  # Must match training resolution (1280)
             verbose=False,
             device=self.device
         )
@@ -251,9 +252,10 @@ class YOLODetector:
             if best_person is not None:
                 best_person["associated_ppe"].append(ppe)
                 
-                if ppe_class == "helmet":
+                # Map new model class names to detection flags
+                if ppe_class == "Helmet":
                     best_person["helmet_detected"] = True
-                elif ppe_class == "vest":
+                elif ppe_class == "Vest":
                     best_person["vest_detected"] = True
                 elif ppe_class == "no_helmet":
                     best_person["no_helmet_detected"] = True
