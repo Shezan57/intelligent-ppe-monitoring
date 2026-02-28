@@ -248,8 +248,21 @@ class HybridDetector:
             )
             return result, path, used_sam, None
 
-        # PATH 1: Fast Violation - explicit no_helmet class, no SAM needed
+        # PATH 1: Fast Violation - explicit no_helmet class
+        # BUT: SAM double-checks to catch YOLO false positives (Judge override)
         if no_helmet_detected:
+            if self.enable_sam:
+                # SAM verifies: is there REALLY no helmet?
+                sam_result = self.sam_verifier.verify_helmet(image, bbox)
+                if sam_result.get("helmet_found", False):
+                    # SAM found a helmet → YOLO was WRONG → flip to SAFE
+                    result, path, used_sam = self._create_result(
+                        person_id, bbox, confidence,
+                        has_helmet=True, has_vest=vest_detected,
+                        path=DecisionPath.RESCUE_HEAD, sam_used=True
+                    )
+                    return result, path, used_sam, None
+            # SAM confirms violation OR SAM disabled → real violation
             result, path, used_sam = self._create_result(
                 person_id, bbox, confidence,
                 has_helmet=False, has_vest=vest_detected,
@@ -445,8 +458,22 @@ class HybridDetector:
             )
         
         # PATH 1: Fast Violation
-        # YOLO explicitly detected "no_helmet" class → Violation, no SAM needed
+        # YOLO explicitly detected "no_helmet" class
+        # BUT: SAM double-checks to catch YOLO false positives (Judge override)
         if no_helmet_detected:
+            if self.enable_sam:
+                # SAM verifies: is there REALLY no helmet?
+                sam_result = self.sam_verifier.verify_helmet(image, bbox)
+                if sam_result.get("helmet_found", False):
+                    # SAM found a helmet → YOLO was WRONG → flip to SAFE
+                    return self._create_result(
+                        person_id, bbox, confidence,
+                        has_helmet=True,
+                        has_vest=vest_detected,
+                        path=DecisionPath.RESCUE_HEAD,
+                        sam_used=True
+                    )
+            # SAM confirms violation OR SAM disabled → real violation
             return self._create_result(
                 person_id, bbox, confidence,
                 has_helmet=False,
