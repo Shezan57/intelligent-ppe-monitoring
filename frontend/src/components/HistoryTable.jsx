@@ -2,10 +2,11 @@
  * History Table Component
  * 
  * Displays violation history with filtering and pagination.
+ * Supports both "All Detections" and "Verified Only" (Judge-confirmed) modes.
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { getHistory, getHistorySummary } from '../api/client'
+import { getHistory, getHistorySummary, getVerifiedViolations } from '../api/client'
 
 function HistoryTable() {
     // State
@@ -13,6 +14,9 @@ function HistoryTable() {
     const [summary, setSummary] = useState(null)
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState(null)
+
+    // Mode toggle: "all" or "verified"
+    const [mode, setMode] = useState('all')
 
     // Filters
     const [dateFilter, setDateFilter] = useState('')
@@ -23,37 +27,43 @@ function HistoryTable() {
     const [totalPages, setTotalPages] = useState(1)
     const pageSize = 10
 
-    // Fetch violations
+    // Fetch violations based on mode
     const fetchViolations = useCallback(async () => {
         setIsLoading(true)
         setError(null)
 
         try {
-            const params = {
-                page,
-                page_size: pageSize
+            if (mode === 'verified') {
+                // Fetch Judge-confirmed violations
+                const params = {
+                    limit: pageSize,
+                    offset: (page - 1) * pageSize,
+                }
+                if (typeFilter) params.violation_type = typeFilter
+
+                const data = await getVerifiedViolations(params)
+                setViolations(data.violations || [])
+                setTotalPages(Math.ceil((data.total_count || 0) / pageSize))
+            } else {
+                // Fetch all detections
+                const params = { page, page_size: pageSize }
+                if (dateFilter) {
+                    params.date_from = dateFilter
+                    params.date_to = dateFilter
+                }
+                if (typeFilter) params.violation_type = typeFilter
+
+                const data = await getHistory(params)
+                setViolations(data.violations || [])
+                setTotalPages(Math.ceil((data.total_count || data.total || 0) / pageSize))
             }
-
-            if (dateFilter) {
-                params.date_from = dateFilter
-                params.date_to = dateFilter
-            }
-
-            if (typeFilter) {
-                params.violation_type = typeFilter
-            }
-
-            const data = await getHistory(params)
-            setViolations(data.violations || [])
-            setTotalPages(Math.ceil((data.total || 0) / pageSize))
-
         } catch (err) {
             console.error('Failed to fetch history:', err)
             setError('Failed to load violation history')
         } finally {
             setIsLoading(false)
         }
-    }, [page, dateFilter, typeFilter])
+    }, [page, dateFilter, typeFilter, mode])
 
     // Fetch summary
     const fetchSummary = useCallback(async () => {
@@ -65,7 +75,7 @@ function HistoryTable() {
         }
     }, [])
 
-    // Load data on mount and filter changes
+    // Load data on mount and filter/mode changes
     useEffect(() => {
         fetchViolations()
     }, [fetchViolations])
@@ -74,10 +84,10 @@ function HistoryTable() {
         fetchSummary()
     }, [fetchSummary])
 
-    // Reset to page 1 when filters change
+    // Reset to page 1 when filters or mode change
     useEffect(() => {
         setPage(1)
-    }, [dateFilter, typeFilter])
+    }, [dateFilter, typeFilter, mode])
 
     // Format timestamp
     const formatTime = (timestamp) => {
@@ -121,19 +131,40 @@ function HistoryTable() {
                 </div>
             )}
 
-            {/* Filters */}
+            {/* Mode Toggle + Filters */}
             <div className="card filters-card">
-                <h4>🔍 Filters</h4>
-                <div className="filters-row">
-                    <div className="filter-group">
-                        <label>Date</label>
-                        <input
-                            type="date"
-                            value={dateFilter}
-                            onChange={(e) => setDateFilter(e.target.value)}
-                            className="input"
-                        />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <h4>🔍 Filters</h4>
+                    <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--bg-secondary)', borderRadius: '8px', padding: '2px' }}>
+                        <button
+                            className={`btn btn--sm ${mode === 'all' ? 'btn--primary' : 'btn--ghost'}`}
+                            onClick={() => setMode('all')}
+                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem', borderRadius: '6px' }}
+                        >
+                            All Detections
+                        </button>
+                        <button
+                            className={`btn btn--sm ${mode === 'verified' ? 'btn--primary' : 'btn--ghost'}`}
+                            onClick={() => setMode('verified')}
+                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem', borderRadius: '6px' }}
+                        >
+                            ⚖️ Verified Only
+                        </button>
                     </div>
+                </div>
+
+                <div className="filters-row">
+                    {mode === 'all' && (
+                        <div className="filter-group">
+                            <label>Date</label>
+                            <input
+                                type="date"
+                                value={dateFilter}
+                                onChange={(e) => setDateFilter(e.target.value)}
+                                className="input"
+                            />
+                        </div>
+                    )}
                     <div className="filter-group">
                         <label>Violation Type</label>
                         <select
@@ -161,7 +192,11 @@ function HistoryTable() {
 
             {/* Table */}
             <div className="card">
-                <h4>📋 Violation History</h4>
+                <h4>
+                    {mode === 'verified'
+                        ? '⚖️ Verified Violations (Judge-Confirmed)'
+                        : '📋 Violation History'}
+                </h4>
 
                 {isLoading ? (
                     <div className="loading-container">
@@ -177,7 +212,7 @@ function HistoryTable() {
                     </div>
                 ) : violations.length === 0 ? (
                     <div className="empty-state">
-                        <p>No violations found</p>
+                        <p>{mode === 'verified' ? 'No verified violations found. Run the pipeline first.' : 'No violations found'}</p>
                     </div>
                 ) : (
                     <>
@@ -185,26 +220,43 @@ function HistoryTable() {
                             <thead>
                                 <tr>
                                     <th>Time</th>
-                                    <th>Site</th>
-                                    <th>Camera</th>
+                                    {mode === 'verified' && <th>Person ID</th>}
+                                    {mode === 'all' && <th>Site</th>}
+                                    <th>{mode === 'verified' ? 'Zone' : 'Camera'}</th>
                                     <th>Type</th>
                                     <th>Path</th>
-                                    <th>Confidence</th>
+                                    <th>{mode === 'verified' ? 'Judge Conf.' : 'Confidence'}</th>
+                                    {mode === 'verified' && <th>SAM Time</th>}
                                 </tr>
                             </thead>
                             <tbody>
                                 {violations.map((v, idx) => (
                                     <tr key={v.id || idx}>
                                         <td>{formatTime(v.timestamp)}</td>
-                                        <td>{v.site_location || '-'}</td>
-                                        <td>{v.camera_id || '-'}</td>
+                                        {mode === 'verified' && (
+                                            <td>
+                                                <span className="badge badge--info">P{v.person_id}</span>
+                                            </td>
+                                        )}
+                                        {mode === 'all' && <td>{v.site_location || '-'}</td>}
+                                        <td>{mode === 'verified' ? (v.camera_zone || '-') : (v.camera_id || '-')}</td>
                                         <td>{getViolationBadge(v.violation_type)}</td>
                                         <td>
                                             <span className="badge badge--path">
                                                 {v.decision_path || '-'}
                                             </span>
                                         </td>
-                                        <td>{((v.detection_confidence || 0) * 100).toFixed(1)}%</td>
+                                        <td>
+                                            {mode === 'verified'
+                                                ? (v.judge_confidence?.toFixed(3) || '-')
+                                                : (((v.detection_confidence || 0) * 100).toFixed(1) + '%')
+                                            }
+                                        </td>
+                                        {mode === 'verified' && (
+                                            <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                                {v.judge_processing_time_ms?.toFixed(0) || '-'}ms
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>

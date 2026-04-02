@@ -170,6 +170,54 @@ async def get_history_summary(
     }
 
 
+@router.get("/history/verified")
+async def get_verified_violations(
+    violation_type: Optional[str] = Query(default=None),
+    camera_zone: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """
+    Get Judge-confirmed verified violations.
+
+    These are only violations that passed SAM 3 verification.
+    """
+    from database.models import VerifiedViolation
+
+    query = db.query(VerifiedViolation)
+
+    if violation_type:
+        query = query.filter(VerifiedViolation.violation_type == violation_type)
+    if camera_zone:
+        query = query.filter(VerifiedViolation.camera_zone == camera_zone)
+
+    total = query.count()
+    violations = query.order_by(desc(VerifiedViolation.timestamp)).offset(offset).limit(limit).all()
+
+    return {
+        "success": True,
+        "total_count": total,
+        "returned_count": len(violations),
+        "violations": [
+            {
+                "id": v.id,
+                "timestamp": v.timestamp.isoformat() if v.timestamp else None,
+                "person_id": v.person_id,
+                "violation_type": v.violation_type,
+                "image_path": v.image_path,
+                "camera_zone": v.camera_zone,
+                "judge_confirmed": v.judge_confirmed,
+                "judge_confidence": v.judge_confidence,
+                "judge_processing_time_ms": v.judge_processing_time_ms,
+                "sentry_confidence": v.sentry_confidence,
+                "decision_path": v.decision_path,
+                "person_bbox": v.person_bbox,
+            }
+            for v in violations
+        ],
+    }
+
 @router.get("/history/{violation_id}", response_model=ViolationResponse)
 async def get_violation_detail(
     violation_id: int,

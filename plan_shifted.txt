@@ -1,0 +1,126 @@
+System Role: You are an expert AI Video Analytics Engineer and Backend Architect. Your task is to build a decoupled, asynchronous computer vision pipeline called the "Sentry-Judge Safety System."
+
+Project Overview:
+The system monitors construction site video feeds to detect Personal Protective Equipment (PPE) violations. To achieve 30 FPS real-time processing while using a heavy foundation model for verification, the architecture is split into two asynchronous processes connected by a message queue. It includes multi-object tracking, a cooldown mechanism to prevent spamming violations for the same person, and an end-of-day LLM agent to generate a PDF report.
+
+Core Tech Stack:
+
+Sentry: YOLOv11m + ByteTrack (or BoT-SORT) via the ultralytics package.
+
+Judge: SAM 3 (or a placeholder for testing) for ROI verification.
+
+Message Broker: Python multiprocessing.Queue or Redis (choose the most robust for local IPC).
+
+Database: SQLite or SQLAlchemy for logging verified violations.
+
+Reporting: LLM API (OpenAI/Gemini) for text generation + FPDF or ReportLab for PDF creation.
+
+Please build this system in four distinct modules. Do not proceed to the next module until the previous one is fully implemented and robust.
+
+Module 1: The Sentry (Real-Time Producer)
+Create a Python script that processes a video stream.
+
+Detection & Tracking: Run YOLOv11m to detect classes (person, helmet, vest, no_helmet). Integrate a tracker to assign a unique Person_ID to each detected person.
+
+Logic & Cooldown: For each frame, analyze the bounding boxes.
+
+Maintain an in-memory dictionary tracking the last violation timestamp for each Person_ID (e.g., cooldown_dict = {'Person_1': 1634567890}).
+
+The cooldown timer is 5 minutes. If a person violates a rule while under cooldown, ignore it.
+
+Triage Paths: Implement the following conditional logic:
+
+Path 0 (Safe): Person has helmet + vest. Do nothing. Update tracker.
+
+Path 1, 2, 3, 4 (Violations/Uncertainty): Missing helmet, missing vest, or explicit no_helmet detection.
+
+Queueing: If a violation/uncertainty is detected AND the Person_ID is not in cooldown:
+
+Crop the Region of Interest (ROI) from the original frame (crop the Head for helmet checks, Torso for vest checks).
+
+Save the ROI image to a temporary local folder.
+
+Push a JSON payload to the message queue containing: {"timestamp": str, "person_id": str, "roi_image_path": str, "suspected_violation": str}.
+
+Update the Person_ID's cooldown timestamp.
+
+Module 2: The Database
+Create an SQLite database initialization script.
+
+Create a table named verified_violations.
+
+Schema: id (Primary Key), timestamp, person_id, violation_type, image_path (path to the saved crop), camera_zone.
+
+Module 3: The Judge (Asynchronous Consumer)
+Create a separate Python script that runs continuously in the background.
+
+Queue Consumption: It must listen to the message queue populated by Module 1.
+
+Verification: When a payload is received, load the image from roi_image_path and pass it to the Judge model (Set this up as a modular class so I can plug in SAM 3 or a YOLO-cls model later. Use a dummy return True function for now to simulate the Judge confirming a violation).
+
+Database Logging: If the Judge confirms the violation, insert the record into the verified_violations SQLite database. If it rejects the Sentry's guess, delete the temporary ROI image and do nothing.
+
+Module 4: The Agentic Reporter
+Create an end-of-day script that aggregates the data.
+
+Query: Extract all records from verified_violations for the current date, ordered by person_id.
+
+LLM Formatting: Send the structured data to an LLM API with the prompt: "Act as an OSHA Safety Officer. Review this list of PPE violations. Write a professional daily summary identifying serial offenders by ID, referencing standard construction safety protocols."
+
+PDF Generation: Use a PDF library to generate a formal document. The PDF must include:
+
+The LLM-generated summary.
+
+A table of all violations.
+
+The actual cropped images embedded next to the corresponding violation records.
+
+Execution Request: Start by providing the directory structure for this project, and then write the complete code for Module 1 (The Sentry). Ensure the code is heavily commented, handles frame-dropping gracefully, and includes the ByteTrack integration.
+
+
+Here is a step-by-step strategy for implementing this tracking and cooldown system.
+
+The Decoupled Tracking & Cooldown Architecture
+Phase 1: Real-Time Detection & Tracking (The Sentry)
+As we established, YOLO runs rapidly. To assign IDs, you need to integrate a tracker.
+
+Integrated Tracking: Combine your YOLOv11m with a fast multi-object tracker like BoT-SORT or ByteTrack. These are often built directly into the YOLO ecosystem (e.g., model.track(source="feed", tracker="botsort.yaml")).
+
+The Sentry's Output: The Sentry now outputs bounding boxes for Head/Torso and an assigned ID (e.g., Person_104).
+
+Conditional Queuing: When a violation is detected (e.g., Path 1: no_helmet), the system checks the ID. Here is where the first layer of cooldown occurs:
+
+Action: If Person_104 has not been flagged for a helmet violation within the last X minutes (the cooldown period), save the ROI image and send the metadata (ID, time, location) to the SAM 3 Queue.
+
+Skip: If Person_104 is already in a cooldown state for a helmet violation, ignore the detection and move to the next frame. Do not queue it for SAM 3.
+
+Phase 2: Asynchronous Verification (The Judge)
+Your SAM 3 process (or a lighter classifier, as we discussed previously) picks up the queued images.
+
+Verification: SAM evaluates the image.
+
+Database Entry: If SAM confirms the violation, it logs a single, verified incident into your database containing:
+
+Timestamp
+
+Person_ID
+
+Violation_Type (e.g., Missing Helmet)
+
+Verified_Image_Path
+
+Location_ID
+
+Phase 3: The End-of-Day Agentic Review
+At the end of the shift, your database contains a refined list of verified violations, deduplicated by the cooldown timer.
+
+Aggregation: The LLM Agent processes the database. It can group violations by ID to identify serial offenders, even across different camera zones if the tracker can re-identify across cameras (which is harder, but the core logic remains).
+
+Reporting: The Agent generates the final PDF report detailing the violations, including the verified images.
+
+Key Advantages of This Approach
+Massive Reduction in Queue Size: The cooldown timer drastically reduces the number of images sent to the Judge. Instead of queuing 30 images of Person_104 per second, you queue one.
+
+No Real-Time Bottleneck: The system continues running smoothly, even when multiple people are violating rules simultaneously.
+
+Better Reporting: The final report is concise. Instead of telling the safety manager a helmet was missing 300 times, it tells them Person_104 was missing a helmet at 10:15 AM and again at 2:30 PM.

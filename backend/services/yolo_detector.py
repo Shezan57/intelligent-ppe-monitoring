@@ -4,11 +4,12 @@ YOLO Detector Service
 YOLOv11m wrapper for PPE detection.
 Handles model loading, inference, and result parsing.
 
-Classes detected by new best.pt model:
+Classes detected by the model:
     0: Helmet    (PPE presence — worker IS wearing helmet)
     1: Vest      (PPE presence — worker IS wearing vest)
     2: Person    (base person detection)
     3: no_helmet (PPE absence  — worker is NOT wearing helmet)
+    4: no_vest   (PPE absence  — worker is NOT wearing vest)
 """
 
 import time
@@ -21,21 +22,20 @@ from ultralytics import YOLO
 from config.settings import settings
 
 
-# ── Class mapping for new best.pt model ──────────────────────────────────────
-# New model has 4 classes only (simplified from old 10-class model)
+# ── Class mapping for the 5-class model ──────────────────────────────────────
 CLASS_NAMES = {
     0: "Helmet",      # Worker IS wearing a helmet  (presence)
     1: "Vest",        # Worker IS wearing a vest    (presence)
     2: "Person",      # Base person detection
     3: "no_helmet",   # Worker is NOT wearing helmet (absence — direct violation signal)
+    4: "no_vest",     # Worker is NOT wearing vest   (absence — direct violation signal)
 }
 
 # PPE presence classes: detected when worker HAS the equipment
 PPE_PRESENCE_CLASSES = {"Helmet", "Vest"}
 
 # PPE absence classes: detected when worker is MISSING equipment
-# Note: new model only has no_helmet; vest absence is inferred from Vest not being detected
-PPE_ABSENCE_CLASSES = {"no_helmet"}
+PPE_ABSENCE_CLASSES = {"no_helmet", "no_vest"}
 
 # Person class ID in the new model
 PERSON_CLASS_ID = 2
@@ -230,6 +230,7 @@ class YOLODetector:
             person["helmet_detected"] = False
             person["vest_detected"] = False
             person["no_helmet_detected"] = False
+            person["no_vest_detected"] = False
             person["associated_ppe"] = []
         
         for ppe in ppe_items:
@@ -252,13 +253,15 @@ class YOLODetector:
             if best_person is not None:
                 best_person["associated_ppe"].append(ppe)
                 
-                # Map new model class names to detection flags
+                # Map model class names to detection flags
                 if ppe_class == "Helmet":
                     best_person["helmet_detected"] = True
                 elif ppe_class == "Vest":
                     best_person["vest_detected"] = True
                 elif ppe_class == "no_helmet":
                     best_person["no_helmet_detected"] = True
+                elif ppe_class == "no_vest":
+                    best_person["no_vest_detected"] = True
         
         return persons
     

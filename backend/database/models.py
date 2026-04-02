@@ -137,6 +137,52 @@ class DailyReport(Base):
         return f"<DailyReport(date={self.report_date}, violations={self.total_violations})>"
 
 
+class VerifiedViolation(Base):
+    """
+    Judge-verified violation record (decoupled architecture).
+
+    Only violations CONFIRMED by the Judge (SAM 3) are stored here.
+    The Sentry (YOLO) sends candidates via the queue; the Judge verifies
+    and writes to this table only if confirmed.
+
+    This is the PRIMARY table for the Agentic Reporter to query.
+    """
+    __tablename__ = "verified_violations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Person tracking
+    person_id = Column(Integer, nullable=False)        # ByteTrack tracking ID
+    camera_zone = Column(String(50), default="zone_1")
+
+    # Violation details
+    violation_type = Column(String(50), nullable=False)  # 'no_helmet', 'no_vest', 'both_missing'
+    image_path = Column(String(500), nullable=True)      # Path to saved ROI crop
+
+    # Judge (SAM 3) verification details
+    judge_confirmed = Column(Boolean, default=True)
+    judge_confidence = Column(Float, nullable=True)
+    judge_processing_time_ms = Column(Float, nullable=True)
+
+    # Sentry context
+    sentry_confidence = Column(Float, nullable=True)
+    decision_path = Column(String(50), nullable=True)
+    person_bbox = Column(JSON, nullable=True)
+
+    # Reporting
+    report_sent = Column(Boolean, default=False)
+
+    __table_args__ = (
+        Index('idx_verified_timestamp', 'timestamp'),
+        Index('idx_verified_person_id', 'person_id'),
+        Index('idx_verified_type', 'violation_type'),
+    )
+
+    def __repr__(self) -> str:
+        return f"<VerifiedViolation(id={self.id}, person={self.person_id}, type={self.violation_type})>"
+
+
 def create_tables(engine):
     """
     Create all database tables.

@@ -92,6 +92,39 @@ export const getHistorySummary = async (days = 7) => {
 }
 
 /**
+ * Run Sentry-Judge pipeline on a video file
+ * @param {File} file - Video file to process
+ * @param {Object} options - Pipeline options
+ * @returns {Promise} Combined Sentry + Judge results
+ */
+export const runPipeline = async (file, options = {}) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (options.cooldownSeconds) {
+        formData.append('cooldown_seconds', options.cooldownSeconds)
+    }
+    if (options.cameraZone) {
+        formData.append('camera_zone', options.cameraZone)
+    }
+
+    const response = await api.post('/detect/video/pipeline', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 600000, // 10 min for long videos
+    })
+    return response.data
+}
+
+/**
+ * Get verified violations (Judge-confirmed only)
+ * @param {Object} params - Query parameters
+ * @returns {Promise} Verified violations list
+ */
+export const getVerifiedViolations = async (params = {}) => {
+    const response = await api.get('/history/verified', { params })
+    return response.data
+}
+
+/**
  * Check API health
  * @returns {Promise} Health status
  */

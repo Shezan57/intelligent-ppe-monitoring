@@ -2,11 +2,13 @@
  * Video Upload Component
  * 
  * Upload and process video files for PPE detection.
+ * Supports both legacy mode and Sentry-Judge pipeline mode.
  */
 
 import { useState, useRef, useCallback } from 'react'
 import toast from 'react-hot-toast'
-import api from '../api/client'
+import api, { runPipeline } from '../api/client'
+import StatsPanel from './StatsPanel'
 
 const ALLOWED_TYPES = ['video/mp4', 'video/avi', 'video/quicktime', 'video/webm', 'video/x-matroska']
 const MAX_SIZE = 100 * 1024 * 1024 // 100MB
@@ -15,26 +17,23 @@ function VideoUpload() {
     const [selectedFile, setSelectedFile] = useState(null)
     const [isProcessing, setIsProcessing] = useState(false)
     const [progress, setProgress] = useState(0)
+    const [progressText, setProgressText] = useState('')
     const [result, setResult] = useState(null)
+    const [usePipeline, setUsePipeline] = useState(true)
     const [frameSkip, setFrameSkip] = useState(5)
     const fileInputRef = useRef(null)
 
     // Handle file selection
     const handleFileSelect = useCallback((file) => {
         if (!file) return
-
-        // Validate type
         if (!ALLOWED_TYPES.includes(file.type)) {
             toast.error('Invalid file type. Use MP4, AVI, MOV, WEBM, or MKV')
             return
         }
-
-        // Validate size
         if (file.size > MAX_SIZE) {
             toast.error('File too large (max 100MB)')
             return
         }
-
         setSelectedFile(file)
         setResult(null)
     }, [])
@@ -43,7 +42,6 @@ function VideoUpload() {
     const handleDrop = useCallback((e) => {
         e.preventDefault()
         e.stopPropagation()
-
         const file = e.dataTransfer.files[0]
         handleFileSelect(file)
     }, [handleFileSelect])
@@ -57,39 +55,61 @@ function VideoUpload() {
 
         setIsProcessing(true)
         setProgress(0)
-        const loadingToast = toast.loading('Processing video...')
 
         try {
-            const formData = new FormData()
-            formData.append('file', selectedFile)
-            formData.append('frame_skip', frameSkip)
+            if (usePipeline) {
+                // === Sentry-Judge Pipeline Mode ===
+                setProgressText('Uploading video...')
+                setProgress(10)
 
-            const response = await api.post('/detect/video', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-                timeout: 300000, // 5 minutes for long videos
-                onUploadProgress: (e) => {
-                    const pct = Math.round((e.loaded / e.total) * 50)
-                    setProgress(pct)
-                }
-            })
+                const loadingToast = toast.loading('Running Sentry-Judge pipeline...')
+                setProgressText('Sentry processing (YOLO + ByteTrack)...')
+                setProgress(30)
 
-            setProgress(100)
-            setResult(response.data)
+                const data = await runPipeline(selectedFile)
 
-            const stats = response.data.aggregated_stats
-            toast.success(
-                `Processed! ${stats.total_violations} violations in ${stats.total_persons_detected} detections`,
-                { id: loadingToast }
-            )
+                setProgressText('Judge verification complete!')
+                setProgress(100)
+                setResult(data)
 
+                const confirmed = data.judge?.confirmed || 0
+                toast.success(
+                    `Pipeline done! ${confirmed} verified violations, ${data.sentry?.effective_fps} FPS`,
+                    { id: loadingToast }
+                )
+            } else {
+                // === Legacy Mode ===
+                const loadingToast = toast.loading('Processing video...')
+                setProgressText('Processing frames...')
+
+                const formData = new FormData()
+                formData.append('file', selectedFile)
+                formData.append('frame_skip', frameSkip)
+
+                const response = await api.post('/detect/video', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    timeout: 300000,
+                    onUploadProgress: (e) => {
+                        const pct = Math.round((e.loaded / e.total) * 50)
+                        setProgress(pct)
+                    }
+                })
+
+                setProgress(100)
+                setResult(response.data)
+
+                const stats = response.data.aggregated_stats
+                toast.success(
+                    `Processed! ${stats.total_violations} violations in ${stats.total_persons_detected} detections`,
+                    { id: loadingToast }
+                )
+            }
         } catch (error) {
             console.error('Video processing error:', error)
-            toast.error(
-                error.response?.data?.detail || 'Video processing failed',
-                { id: loadingToast }
-            )
+            toast.error(error.response?.data?.detail || 'Video processing failed')
         } finally {
             setIsProcessing(false)
+            setProgressText('')
         }
     }
 
@@ -98,10 +118,13 @@ function VideoUpload() {
         setSelectedFile(null)
         setResult(null)
         setProgress(0)
+        setProgressText('')
         if (fileInputRef.current) {
             fileInputRef.current.value = ''
         }
     }
+
+    const isPipelineResult = result?.pipeline === true
 
     return (
         <div className="video-upload-container">
@@ -137,23 +160,42 @@ function VideoUpload() {
                 )}
             </div>
 
-            {/* Frame Skip Setting */}
+            {/* Mode Toggle */}
             <div className="card" style={{ marginTop: '1rem' }}>
                 <div className="setting-item">
-                    <label>Frame Skip (process every Nth frame)</label>
-                    <div className="setting-control">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                         <input
-                            type="range"
-                            min="1"
-                            max="15"
-                            value={frameSkip}
-                            onChange={(e) => setFrameSkip(parseInt(e.target.value))}
+                            type="checkbox"
+                            checked={usePipeline}
+                            onChange={(e) => setUsePipeline(e.target.checked)}
                             disabled={isProcessing}
+                            style={{ width: '18px', height: '18px' }}
                         />
-                        <span className="setting-value">{frameSkip}</span>
-                    </div>
-                    <small>Higher = faster processing, lower accuracy</small>
+                        <span>
+                            <strong>🛡️ Sentry-Judge Pipeline</strong>
+                            <small style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                                Decoupled: YOLO → Queue → SAM 3 verification → DB
+                            </small>
+                        </span>
+                    </label>
                 </div>
+
+                {!usePipeline && (
+                    <div className="setting-item" style={{ marginTop: '0.5rem' }}>
+                        <label>Frame Skip (process every Nth frame)</label>
+                        <div className="setting-control">
+                            <input
+                                type="range"
+                                min="1"
+                                max="15"
+                                value={frameSkip}
+                                onChange={(e) => setFrameSkip(parseInt(e.target.value))}
+                                disabled={isProcessing}
+                            />
+                            <span className="setting-value">{frameSkip}</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Progress Bar */}
@@ -165,7 +207,9 @@ function VideoUpload() {
                             style={{ width: `${progress}%` }}
                         />
                     </div>
-                    <span className="progress-text">{progress}%</span>
+                    <span className="progress-text">
+                        {progressText || `${progress}%`}
+                    </span>
                 </div>
             )}
 
@@ -180,10 +224,10 @@ function VideoUpload() {
                     {isProcessing ? (
                         <>
                             <span className="loading-spinner" style={{ width: '16px', height: '16px' }}></span>
-                            Processing...
+                            {usePipeline ? 'Running Pipeline...' : 'Processing...'}
                         </>
                     ) : (
-                        '🎬 Process Video'
+                        usePipeline ? '🛡️ Run Pipeline' : '🎬 Process Video'
                     )}
                 </button>
 
@@ -198,8 +242,70 @@ function VideoUpload() {
                 )}
             </div>
 
-            {/* Results */}
-            {result && (
+            {/* Pipeline Results */}
+            {isPipelineResult && (
+                <div style={{ marginTop: '1rem' }}>
+                    <StatsPanel pipelineStats={result} />
+
+                    {/* Verified Violations */}
+                    {result.verified_violations?.length > 0 && (
+                        <div className="card" style={{ marginTop: '1rem' }}>
+                            <h4 style={{ marginBottom: '0.75rem' }}>⚖️ Verified Violations (Judge-Confirmed)</h4>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Person</th>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Type</th>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Time</th>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Zone</th>
+                                            <th style={{ padding: '0.5rem', textAlign: 'right' }}>Confidence</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {result.verified_violations.map((v) => (
+                                            <tr key={v.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                <td style={{ padding: '0.5rem' }}>
+                                                    <span className="badge badge--warning">P{v.person_id}</span>
+                                                </td>
+                                                <td style={{ padding: '0.5rem' }}>
+                                                    <span className={`badge badge--${v.violation_type === 'both_missing' ? 'danger' : 'warning'}`}>
+                                                        {v.violation_type}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>
+                                                    {v.timestamp ? new Date(v.timestamp).toLocaleTimeString() : '-'}
+                                                </td>
+                                                <td style={{ padding: '0.5rem' }}>{v.camera_zone || '-'}</td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                                    {v.judge_confidence?.toFixed(3) || '-'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Download Annotated Video */}
+                    {result.output_video_url && (
+                        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                            <a
+                                href={result.output_video_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn--primary"
+                            >
+                                📥 Download Annotated Video
+                            </a>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Legacy Results */}
+            {result && !isPipelineResult && (
                 <div className="card video-results" style={{ marginTop: '1rem' }}>
                     <h4>📊 Video Analysis Results</h4>
 
@@ -248,16 +354,10 @@ function VideoUpload() {
                         <div className="result-item result-item--large">
                             <span className="result-label">Compliance Rate</span>
                             <span className={`result-value ${result.aggregated_stats?.compliance_rate > 80
-                                    ? 'result-value--safe'
-                                    : 'result-value--violation'
+                                ? 'result-value--safe'
+                                : 'result-value--violation'
                                 }`}>
                                 {result.aggregated_stats?.compliance_rate?.toFixed(1)}%
-                            </span>
-                        </div>
-                        <div className="result-item result-item--large">
-                            <span className="result-label">Violation Frames</span>
-                            <span className="result-value">
-                                {result.aggregated_stats?.unique_violation_frames}
                             </span>
                         </div>
                     </div>

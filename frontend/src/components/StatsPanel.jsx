@@ -1,9 +1,119 @@
 /**
  * StatsPanel Component
- * Displays detection statistics and metrics
+ * Displays detection and pipeline statistics
  */
 
-const StatsPanel = ({ stats, timing }) => {
+const StatsPanel = ({ stats, timing, pipelineStats }) => {
+    // Pipeline mode — show Sentry + Judge stats
+    if (pipelineStats) {
+        const { sentry, judge, bypass_rate } = pipelineStats
+
+        return (
+            <div className="card">
+                <div className="card__header">
+                    <h3 className="card__title">📊 Pipeline Statistics</h3>
+                </div>
+
+                {/* Sentry Section */}
+                <div style={{ marginBottom: '1rem' }}>
+                    <h4 style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        🛡️ Sentry (YOLO + ByteTrack)
+                    </h4>
+                    <div className="stats-panel">
+                        <div className="stat-item">
+                            <div className="stat-item__value">{sentry.effective_fps}</div>
+                            <div className="stat-item__label">FPS</div>
+                        </div>
+                        <div className="stat-item">
+                            <div className="stat-item__value">{sentry.unique_persons}</div>
+                            <div className="stat-item__label">Persons Tracked</div>
+                        </div>
+                        <div className="stat-item">
+                            <div className="stat-item__value">{sentry.frames_processed}</div>
+                            <div className="stat-item__label">Frames</div>
+                        </div>
+                        <div className={`stat-item stat-item--${bypass_rate >= 70 ? 'safe' : 'warning'}`}>
+                            <div className="stat-item__value">{bypass_rate}%</div>
+                            <div className="stat-item__label">SAM Bypass</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Judge Section */}
+                <div style={{ marginBottom: '1rem' }}>
+                    <h4 style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        ⚖️ Judge (SAM 3 Verification)
+                    </h4>
+                    <div className="stats-panel">
+                        <div className={`stat-item stat-item--${judge.confirmed > 0 ? 'violation' : 'safe'}`}>
+                            <div className="stat-item__value">{judge.confirmed}</div>
+                            <div className="stat-item__label">Confirmed</div>
+                        </div>
+                        <div className="stat-item stat-item--safe">
+                            <div className="stat-item__value">{judge.rejected}</div>
+                            <div className="stat-item__label">Rejected</div>
+                        </div>
+                        <div className="stat-item">
+                            <div className="stat-item__value">{judge.not_person_rejected}</div>
+                            <div className="stat-item__label">Not Person</div>
+                        </div>
+                        <div className="stat-item">
+                            <div className="stat-item__value">{judge.avg_time_ms}ms</div>
+                            <div className="stat-item__label">Avg SAM Time</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Efficiency Metrics */}
+                <div style={{ marginBottom: '0.5rem' }}>
+                    <h4 style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        📈 Efficiency
+                    </h4>
+                    <div className="stats-panel">
+                        <div className="stat-item">
+                            <div className="stat-item__value">{sentry.violations_queued}</div>
+                            <div className="stat-item__label">Queued</div>
+                        </div>
+                        <div className="stat-item">
+                            <div className="stat-item__value">{sentry.cooldown_skipped}</div>
+                            <div className="stat-item__label">Cooldown Skips</div>
+                        </div>
+                        <div className="stat-item">
+                            <div className="stat-item__value">{sentry.filtered_false_persons}</div>
+                            <div className="stat-item__label">False Persons</div>
+                        </div>
+                        <div className="stat-item">
+                            <div className="stat-item__value">{judge.confirmation_rate}%</div>
+                            <div className="stat-item__label">Confirm Rate</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Path Distribution */}
+                {sentry.path_distribution && Object.keys(sentry.path_distribution).length > 0 && (
+                    <div className="mt-md">
+                        <h4 style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            🔀 Decision Paths
+                        </h4>
+                        {Object.entries(sentry.path_distribution).map(([path, count]) => (
+                            <div key={path} className="flex justify-between mb-sm" style={{ fontSize: '0.8rem' }}>
+                                <span>{path}</span>
+                                <span className="badge badge--info">{count}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {judge.sam_mock_mode && (
+                    <div className="mt-sm" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                        ⚠️ SAM running in mock mode (no GPU)
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    // Original mode — single image detection stats
     if (!stats) {
         return (
             <div className="card">
