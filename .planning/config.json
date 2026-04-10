@@ -1,0 +1,13 @@
+{
+    "workflow": {
+        "research": false,
+        "plan_check": false,
+        "verifier": true,
+        "nyquist_validation": true
+    },
+    "mode": "yolo",
+    "granularity": "standard",
+    "parallelization": true,
+    "commit_docs": true,
+    "model_profile": "balanced"
+}
