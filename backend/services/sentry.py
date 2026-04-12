@@ -199,7 +199,7 @@ class Sentry:
         Returns:
             Tuple of (annotated_frame, list_of_frame_results)
         """
-        # === YOLO with ByteTrack tracking ===
+        # === YOLO with Track (ByteTrack integrated) ===
         track_results = self.yolo.model.track(
             frame,
             conf=settings.yolo_confidence_threshold,
@@ -212,20 +212,32 @@ class Sentry:
         annotated = frame.copy()
         frame_results = []
 
-        if track_results[0].boxes is None or track_results[0].boxes.id is None:
+        if track_results[0].boxes is None or len(track_results[0].boxes) == 0:
             return annotated, frame_results
 
         boxes = track_results[0].boxes.xyxy.cpu().numpy()
-        track_ids = track_results[0].boxes.id.cpu().numpy().astype(int)
         cls_ids = track_results[0].boxes.cls.cpu().numpy().astype(int)
         confs = track_results[0].boxes.conf.cpu().numpy()
         model_names = self.yolo.model.names
 
+        # Get IDs if available from tracker
+        track_ids = track_results[0].boxes.id
+        if track_ids is not None:
+            track_ids = track_ids.cpu().numpy().astype(int)
+        else:
+            # Fallback if tracker fails to assign ID in this frame
+            track_ids = np.zeros(len(boxes), dtype=int)
+
         frame_area = frame_w * frame_h
 
-        for box, tid, cls_id, conf in zip(boxes, track_ids, cls_ids, confs):
+        for box, cls_id, conf, tid in zip(boxes, cls_ids, confs, track_ids):
             # Only process Person class
-            if cls_id != 2:
+            name = model_names.get(int(cls_id), "").lower()
+            if name != "person":
+                continue
+
+            # Skip unassigned IDs
+            if tid == 0:
                 continue
 
             # === Filter false persons (buildings, objects) ===
@@ -249,7 +261,7 @@ class Sentry:
 
             self.stats["unique_persons"].add(tid)
             self.stats["total_detections"] += 1
-            bbox = box.tolist()
+            bbox = box
 
             # === Associate PPE items with this person ===
             helmet_detected = False
@@ -258,19 +270,22 @@ class Sentry:
             no_vest_detected = False
 
             for b2, c2, _ in zip(boxes, cls_ids, confs):
-                if c2 == 2:  # Skip other persons
+                # Check by name, not hardcoded ID
+                name = model_names.get(int(c2), "").lower()
+                if name == "person":
                     continue
-                from utils.bbox_utils import is_inside_bbox
+                from utils.bbox_utils import is_inside_bbox, expand_bbox
                 ppe_bbox = b2.tolist()
-                if is_inside_bbox(ppe_bbox, bbox, threshold=0.5):
-                    name = model_names.get(int(c2), "")
-                    if name == "Helmet":
+                # Expand person bbox by 20% to catch floating helmets
+                expanded_bbox = expand_bbox(bbox, expand_ratio=0.2)
+                if is_inside_bbox(ppe_bbox, expanded_bbox, threshold=0.01):
+                    if name == "helmet":
                         helmet_detected = True
-                    elif name == "Vest":
+                    elif name == "vest":
                         vest_detected = True
-                    elif name == "no_helmet":
+                    elif name == "no-helmet":
                         no_helmet_detected = True
-                    elif name == "no_vest":
+                    elif name == "no-vest":
                         no_vest_detected = True
 
             # === 5-Path Triage ===

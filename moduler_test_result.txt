@@ -1,0 +1,115 @@
+test with images:
+test 1:
+
+female-construction-worker-without-helmet-260nw-2567321355.webp(image/webp) - 18498 bytes, last modified: 12/19/2025 - 100% done
+Saving female-construction-worker-without-helmet-260nw-2567321355.webp to female-construction-worker-without-helmet-260nw-2567321355.webp
+Loaded: female-construction-worker-without-helmet-260nw-2567321355.webp (260x280px)
+========================================
+ STEP 1: YOLO INFERENCE
+========================================
+YOLO Processing time: 104.4ms
+Detected 1 persons.
+
+--- Person 1 ---
+YOLO BBox: [53.156578063964844, 96.18311309814453, 218.4447784423828, 258.8412780761719]
+YOLO Confidence: 0.33
+YOLO says -> Helmet: False, Vest: True
+Decided Path: Rescue Head
+  -> Extracted Head ROI: [53, 96, 218, 161]
+WARNING ⚠️ imgsz=[640] must be multiple of max stride 14, updating to [644]
+Results saved to /content/backend/runs/segment/predict
+  -> SAM Helmet says: False (Conf: 0.000)
+
+test 2:
+
+senior-foreman-performing-inspection-construction-260nw-2502078473.webp(image/webp) - 35536 bytes, last modified: 12/21/2025 - 100% done
+Saving senior-foreman-performing-inspection-construction-260nw-2502078473.webp to senior-foreman-performing-inspection-construction-260nw-2502078473.webp
+Loaded: senior-foreman-performing-inspection-construction-260nw-2502078473.webp (390x280px)
+========================================
+ STEP 1: YOLO INFERENCE
+========================================
+YOLO Processing time: 95.8ms
+Detected 0 persons.
+
+
+test 3:
+
+Worker-working-without-safety-boots-hand-gloves-head-protection_Q320 (1).jpg(image/jpeg) - 28863 bytes, last modified: 12/20/2025 - 100% done
+Saving Worker-working-without-safety-boots-hand-gloves-head-protection_Q320 (1).jpg to Worker-working-without-safety-boots-hand-gloves-head-protection_Q320 (1) (1).jpg
+Loaded: Worker-working-without-safety-boots-hand-gloves-head-protection_Q320 (1) (1).jpg (320x320px)
+========================================
+ STEP 1: YOLO INFERENCE
+========================================
+YOLO Processing time: 44.1ms
+Detected 0 persons.
+
+
+test with video:
+
+12098511-hd_1920_1080_50fps.mp4(video/mp4) - 5688774 bytes, last modified: 1/26/2026 - 100% done
+Saving 12098511-hd_1920_1080_50fps.mp4 to 12098511-hd_1920_1080_50fps (1).mp4
+Processing Video: /content/12098511-hd_1920_1080_50fps (1).mp4...
+Processed 30 frames...
+Processed 60 frames...
+Processed 90 frames...
+Processed 120 frames...
+Processed 150 frames...
+Finished. Saved to /content/modular_debug_output.mp4.
+Download and review to see exact tracked ROIs.
+
+Nothing detected in the video. It gives me an output video with no detection.
+
+but I tried with below mentioned code it works fine and gave me a output video with detected classes and bbox 
+
+import os
+import glob
+from ultralytics import YOLO
+
+# 1. Load your custom model (update this path to your actual best.pt location)
+model = YOLO("/content/drive/MyDrive/ppe_models/best.pt")
+
+# 2. Define your uploaded video
+# (Make sure you have uploaded a test video to your Colab workspace!)
+video_path = "/content/12098511-hd_1920_1080_50fps.mp4"
+
+print(f"Starting frame-by-frame processing for: {video_path}...")
+
+# 3. Run the prediction
+results = model.predict(
+    source=video_path,
+    conf=0.25,       # 25% confidence threshold
+    imgsz=640,       # Forcing your training resolution!
+    save=True,       # Save the output video with bounding boxes
+    stream=True      # Memory-safe processing for videos
+)
+
+# 4. Execute the stream
+# When using stream=True, you MUST loop through the results to trigger the processing
+for frame_idx, frame_result in enumerate(results):
+    if frame_idx % 30 == 0:  # Print an update every 30 frames
+        print(f"Processed frame {frame_idx}...")
+
+print("\n✅ Video processing complete!")
+
+# ============================================================
+# 5. AUTO-DOWNLOAD THE RESULT (If using Google Colab)
+# ============================================================
+try:
+    from google.colab import files
+
+    # YOLO saves outputs in runs/detect/predict... let's find the newest video file
+    output_videos = glob.glob('runs/detect/predict*/*.avi') + glob.glob('runs/detect/predict*/*.mp4')
+
+    if output_videos:
+        # Find the most recently created video file
+        latest_video = max(output_videos, key=os.path.getctime)
+        print(f"Downloading annotated video: {latest_video}")
+        files.download(latest_video)
+    else:
+        print("Could not find the saved output video.")
+except ImportError:
+    # If you run this locally instead of Colab, it will just skip the download step
+    print("Check your 'runs/detect/' folder for the saved video!")
+
+
+I am suspecting that the issue is with the tracking system. we are using a custom person tracking system maybe its causing the failure. find out and try to fix the issus.

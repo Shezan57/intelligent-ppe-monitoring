@@ -28,15 +28,15 @@ class Settings(BaseSettings):
     # ===== YOLO Model =====
     yolo_model_path: str = Field(
         default="./models/best.pt",
-        description="Path to trained YOLOv11m weights"
+        description="Path to trained YOLO26m weights"
     )
     yolo_confidence_threshold: float = Field(
-        default=0.25,
+        default=0.30,
         description="Minimum confidence for YOLO detections"
     )
     yolo_imgsz: int = Field(
-        default=1280,
-        description="Inference image size — must match training resolution (best.pt trained at 1280)"
+        default=640,
+        description="Inference image size — must match training resolution (best.pt trained at 640)"
     )
     
     # ===== SAM Model =====

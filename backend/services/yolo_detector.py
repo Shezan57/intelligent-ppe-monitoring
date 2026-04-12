@@ -1,7 +1,7 @@
 """
 YOLO Detector Service
 
-YOLOv11m wrapper for PPE detection.
+YOLO26m wrapper for PPE detection.
 Handles model loading, inference, and result parsing.
 
 Classes detected by the model:
@@ -43,7 +43,7 @@ PERSON_CLASS_ID = 2
 
 class YOLODetector:
     """
-    YOLOv11m detector for PPE detection.
+    YOLO26m detector for PPE detection.
     
     This service handles:
     - Model loading and initialization
@@ -67,7 +67,7 @@ class YOLODetector:
         Initialize YOLO detector.
         
         Args:
-            model_path: Path to YOLOv11m weights (uses settings if not provided)
+            model_path: Path to YOLO26m weights (uses settings if not provided)
             confidence_threshold: Min confidence (uses settings if not provided)
             device: Inference device (uses settings if not provided)
         """
@@ -95,7 +95,7 @@ class YOLODetector:
         if not model_path.exists():
             raise FileNotFoundError(
                 f"YOLO model weights not found at: {model_path}\n"
-                f"Please place your trained yolov11m_best.pt in the models/ directory."
+                f"Please place your trained best.pt in the models/ directory."
             )
         
         try:
@@ -139,7 +139,7 @@ class YOLODetector:
         results = self.model(
             image,
             conf=self.confidence_threshold,
-            imgsz=settings.yolo_imgsz,  # Must match training resolution (1280)
+            imgsz=settings.yolo_imgsz,  # Must match training resolution (640)
             verbose=False,
             device=self.device
         )
@@ -187,20 +187,27 @@ class YOLODetector:
         confidences = result.boxes.conf.cpu().numpy()
         class_ids = result.boxes.cls.cpu().numpy().astype(int)
         
+        # Get the actual class names from the trained model weights (dynamic, not hardcoded)
+        model_names = self.model.names
+        
         for i, (box, conf, cls_id) in enumerate(zip(boxes, confidences, class_ids)):
             bbox = box.tolist()  # [x_min, y_min, x_max, y_max]
+            
+            # Dynamically get the name from the model and force lowercase for safe mapping
+            raw_name = model_names.get(cls_id, f"unknown_{cls_id}").lower()
             
             detection = {
                 "id": i,
                 "bbox": bbox,
                 "confidence": float(conf),
                 "class_id": int(cls_id),
-                "class_name": CLASS_NAMES.get(cls_id, f"unknown_{cls_id}")
+                "class_name": raw_name
             }
             
-            if cls_id == PERSON_CLASS_ID:
+            # Check by name, not by hardcoded ID
+            if raw_name == "person":
                 persons.append(detection)
-            elif cls_id in CLASS_NAMES:
+            else:
                 ppe_items.append(detection)
         
         return persons, ppe_items
@@ -214,8 +221,8 @@ class YOLODetector:
         Associate PPE items with their corresponding persons.
         
         A PPE item is associated with a person if:
-        - The PPE bbox overlaps significantly with the person bbox
-        - The overlap ratio exceeds the threshold
+        - The PPE bbox overlaps with the person's EXPANDED bbox
+        - The expanded bbox catches helmets that float slightly above the person
         
         Args:
             persons: List of person detections
@@ -224,7 +231,7 @@ class YOLODetector:
         Returns:
             Updated persons list with PPE associations
         """
-        from utils.bbox_utils import is_inside_bbox
+        from utils.bbox_utils import is_inside_bbox, expand_bbox
         
         for person in persons:
             person["helmet_detected"] = False
@@ -242,10 +249,13 @@ class YOLODetector:
             for person in persons:
                 person_bbox = person["bbox"]
                 
-                # Check if PPE is inside person bbox
-                if is_inside_bbox(ppe_bbox, person_bbox, threshold=0.5):
+                # Expand person bbox by 20% to catch floating helmets above head
+                expanded_person_bbox = expand_bbox(person_bbox, expand_ratio=0.2)
+                
+                # Use expanded box with low threshold so even grazing helmets count
+                if is_inside_bbox(ppe_bbox, expanded_person_bbox, threshold=0.01):
                     # Calculate overlap for ranking
-                    overlap = self._calculate_overlap(ppe_bbox, person_bbox)
+                    overlap = self._calculate_overlap(ppe_bbox, expanded_person_bbox)
                     if overlap > best_overlap:
                         best_overlap = overlap
                         best_person = person
@@ -253,14 +263,14 @@ class YOLODetector:
             if best_person is not None:
                 best_person["associated_ppe"].append(ppe)
                 
-                # Map model class names to detection flags
-                if ppe_class == "Helmet":
+                # Map model class names to detection flags (lowercase from _parse_results)
+                if ppe_class == "helmet":
                     best_person["helmet_detected"] = True
-                elif ppe_class == "Vest":
+                elif ppe_class == "vest":
                     best_person["vest_detected"] = True
-                elif ppe_class == "no_helmet":
+                elif ppe_class == "no-helmet":
                     best_person["no_helmet_detected"] = True
-                elif ppe_class == "no_vest":
+                elif ppe_class == "no-vest":
                     best_person["no_vest_detected"] = True
         
         return persons

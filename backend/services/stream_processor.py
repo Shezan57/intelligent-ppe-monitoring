@@ -16,7 +16,6 @@ from datetime import datetime
 
 import numpy as np
 
-from services.hybrid_detector import get_hybrid_detector
 from utils.visualization import draw_detections
 from config.settings import settings
 
@@ -64,8 +63,27 @@ class StreamProcessor:
         """
         self.frame_skip = frame_skip
         self.max_fps = max_fps
-        self.detector = get_hybrid_detector()
         self.is_processing = False
+
+        import queue
+        from services.sentry import Sentry
+        from services.judge import Judge
+        from database.connection import SessionLocal
+
+        # Boot up decoupled pipeline instances
+        self.violation_queue = queue.Queue()
+        self.judge = Judge(
+            queue=self.violation_queue,
+            db_session_factory=SessionLocal,
+            roi_cleanup=False
+        )
+        self.judge.start_background()
+
+        self.sentry = Sentry(
+            queue=self.violation_queue,
+            cooldown_seconds=300.0,
+            camera_zone="web_stream"
+        )
         
     def process_video_file(
         self,
@@ -150,28 +168,31 @@ class StreamProcessor:
                 if frame_count % self.frame_skip != 0:
                     continue
                 
-                # Run detection
-                result = self.detector.detect(frame, save_annotated=False)
+                # Run Sentry Detection
+                h, w = frame.shape[:2]
+                annotated, persons_list = self.sentry._process_frame(frame, w, h)
                 
-                # Create annotated frame
-                annotated = draw_detections(frame, result)
+                stats_snapshot = {
+                    "total_persons": len(persons_list),
+                    "total_violations": sum(1 for p in persons_list if p.get("is_violation", False))
+                }
                 
                 # Store result
                 timestamp_ms = (frame_count / fps) * 1000
                 frame_result = FrameResult(
                     frame_number=frame_count,
                     timestamp_ms=timestamp_ms,
-                    persons=result["persons"],
-                    stats=result["stats"],
+                    persons=persons_list,
+                    stats=stats_snapshot,
                     annotated_frame=annotated
                 )
                 frame_results.append(frame_result)
                 
                 # Update aggregates
                 processed_count += 1
-                total_persons += result["stats"]["total_persons"]
-                total_violations += result["stats"]["total_violations"]
-                all_persons.extend(result["persons"])
+                total_persons += stats_snapshot["total_persons"]
+                total_violations += stats_snapshot["total_violations"]
+                all_persons.extend(persons_list)
                 
                 # Write to output video
                 if out:
@@ -252,16 +273,21 @@ class StreamProcessor:
                 if frame_count % self.frame_skip != 0:
                     continue
                 
-                result = self.detector.detect(frame, save_annotated=False)
-                annotated = draw_detections(frame, result)
+                h, w = frame.shape[:2]
+                annotated, persons_list = self.sentry._process_frame(frame, w, h)
+                
+                stats_snapshot = {
+                    "total_persons": len(persons_list),
+                    "total_violations": sum(1 for p in persons_list if p.get("is_violation", False))
+                }
                 
                 timestamp_ms = (frame_count / fps) * 1000
                 
                 yield FrameResult(
                     frame_number=frame_count,
                     timestamp_ms=timestamp_ms,
-                    persons=result["persons"],
-                    stats=result["stats"],
+                    persons=persons_list,
+                    stats=stats_snapshot,
                     annotated_frame=annotated
                 )
         finally:
@@ -288,9 +314,14 @@ class StreamProcessor:
             if not ret:
                 raise ValueError("Could not read frame from webcam")
             
-            # Run detection
-            result = self.detector.detect(frame, save_annotated=False)
-            annotated = draw_detections(frame, result)
+            # Run Sentry Detection
+            h, w = frame.shape[:2]
+            annotated, persons_list = self.sentry._process_frame(frame, w, h)
+            
+            stats_snapshot = {
+                "total_persons": len(persons_list),
+                "total_violations": sum(1 for p in persons_list if p.get("is_violation", False))
+            }
             
             # Encode annotated frame as base64
             _, buffer = cv2.imencode('.jpg', annotated)
@@ -303,9 +334,9 @@ class StreamProcessor:
                     "height": frame.shape[0],
                     "annotated_base64": annotated_base64
                 },
-                "persons": result["persons"],
-                "stats": result["stats"],
-                "timing": result["timing"]
+                "persons": persons_list,
+                "stats": stats_snapshot,
+                "timing": {"yolo_ms": 0, "sam_ms": 0, "postprocess_ms": 0}
             }
         finally:
             cap.release()

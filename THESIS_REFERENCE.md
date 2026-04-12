@@ -20,7 +20,7 @@ Video → SENTRY (YOLO+ByteTrack) → Queue → JUDGE (SAM 3) → DB → REPORTE
 ```
 
 ### The Sentry (Fast Detector)
-- **Model:** YOLOv11m (5 classes: Helmet, Vest, Person, no-helmet, no-vest)
+- **Model:** YOLO26m (5 classes: Helmet, Vest, Person, no-helmet, no-vest)
 - **Tracker:** ByteTrack — assigns persistent Person IDs across frames
 - **Role:** Real-time triage at 25-30 FPS. Never waits for SAM.
 - **Cooldown:** Per-person, per-violation-type. Default 5 min. Prevents alert spam.
@@ -61,7 +61,7 @@ Video → SENTRY (YOLO+ByteTrack) → Queue → JUDGE (SAM 3) → DB → REPORTE
 | Pipeline | `backend/run_pipeline.py` | ~170 | Orchestrator |
 | Reporter | `backend/agents/agentic_reporter.py` | ~300 | LLM summary + PDF report |
 | SAM Wrapper | `backend/services/sam_verifier.py` | ~350 | SAM3SemanticPredictor API wrapper |
-| YOLO Wrapper | `backend/services/yolo_detector.py` | ~250 | YOLOv11m detection + PPE association |
+| YOLO Wrapper | `backend/services/yolo_detector.py` | ~250 | YOLO26m detection + PPE association |
 | DB Models | `backend/database/models.py` | ~210 | Violation + VerifiedViolation + DailyReport |
 | Old Detector | `backend/services/hybrid_detector.py` | ~530 | Coupled version (used by API/frontend) |
 
@@ -116,7 +116,7 @@ sentry_confidence, decision_path, person_bbox, report_sent
 
 | Term | Meaning |
 |------|---------|
-| Sentry | The fast first-pass detector (YOLOv11m + ByteTrack) |
+| Sentry | The fast first-pass detector (YOLO26m + ByteTrack) |
 | Judge | The semantic verifier (SAM 3) that confirms/rejects Sentry's decisions |
 | Absence Detection Paradox | The asymmetry between detecting present vs absent PPE |
 | Geometric Prompt Engineering | Cropping specific ROI regions for targeted SAM verification |
@@ -130,7 +130,7 @@ sentry_confidence, decision_path, person_bbox, report_sent
 
 | Layer | Technology |
 |-------|-----------|
-| Detection | YOLOv11m (ultralytics) |
+| Detection | YOLO26m (ultralytics) |
 | Verification | SAM 3 / SAM3SemanticPredictor |
 | Tracking | ByteTrack (via ultralytics) |
 | Backend | Python, FastAPI, SQLAlchemy |

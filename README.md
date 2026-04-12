@@ -23,7 +23,7 @@ A real-time Personal Protective Equipment (PPE) detection system that uses a nov
 
 ## 🛠️ Technology Stack
 
-**Backend:** FastAPI, PyTorch, YOLOv11m, SAM3, SQLAlchemy  
+**Backend:** FastAPI, PyTorch, YOLO26m, SAM3, SQLAlchemy  
 **Frontend:** React 18, Vite 5, Axios  
 **Database:** SQLite (dev) / PostgreSQL (prod)
 
