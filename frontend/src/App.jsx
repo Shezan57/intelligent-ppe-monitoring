@@ -16,6 +16,7 @@ import ViolationCard from './components/ViolationCard'
 import HistoryTable from './components/HistoryTable'
 import SettingsPanel from './components/SettingsPanel'
 import VideoUpload from './components/VideoUpload'
+import ChatBot from './components/ChatBot'
 import { detectViolations } from './api/client'
 
 function App() {
@@ -120,6 +121,12 @@ function App() {
                         onClick={() => setActiveTab('history')}
                     >
                         📋 Violation History
+                    </button>
+                    <button
+                        className={`nav-tab ${activeTab === 'chatbot' ? 'nav-tab--active' : ''}`}
+                        onClick={() => setActiveTab('chatbot')}
+                    >
+                        💬 Ask AI
                     </button>
                 </div>
 
@@ -268,6 +275,11 @@ function App() {
                 {/* History Tab */}
                 {activeTab === 'history' && (
                     <HistoryTable />
+                )}
+
+                {/* Chatbot Tab */}
+                {activeTab === 'chatbot' && (
+                    <ChatBot />
                 )}
             </main>
 

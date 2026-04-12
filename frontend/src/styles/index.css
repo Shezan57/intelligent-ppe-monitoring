@@ -1029,3 +1029,16 @@ select.input {
 .history-container {
   padding: var(--spacing-lg);
 }
+
+/* ===== Chatbot Typing Animation ===== */
+.typing-dot {
+  display: inline-block;
+  animation: typingBounce 1.2s infinite ease-in-out;
+  font-size: 0.6rem;
+  color: var(--primary-500);
+}
+
+@keyframes typingBounce {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-4px); }
+}
