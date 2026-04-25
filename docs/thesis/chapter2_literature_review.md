@@ -19,7 +19,7 @@ YOLOv7 [5], published at CVPR 2023 by Wang et al., introduced trainable bag-of-f
 
 YOLOv8 [6], released by Ultralytics in January 2023, adopted an anchor-free detection head and a decoupled head architecture that separates classification and localization tasks. This architectural change improved both accuracy and training convergence speed.
 
-The model selected for this work, YOLOv11 [7], represents the most recent iteration in the Ultralytics family at the time of development. It extends the YOLOv8 architecture with improved feature extraction, enhanced attention mechanisms, and optimized model scaling. The medium variant (YOLO11m) provides a practical balance between accuracy and inference speed for the construction site monitoring domain.
+The model selected for this work, YOLO26m [7], represents the latest generation in the Ultralytics YOLO family at the time of development. It extends the prior architecture with improved feature extraction, enhanced attention mechanisms, and optimized model scaling, providing a practical balance between accuracy and inference speed for the construction site monitoring domain.
 
 ### 2.2.2 Attention Mechanisms in Detection
 
@@ -50,6 +50,14 @@ Prior to SAM, Mask R-CNN [9] represented the standard approach for instance segm
 Modern multi-object tracking (MOT) algorithms follow the tracking-by-detection paradigm, where objects are first detected in individual frames and then associated across frames to form continuous trajectories. The association step is typically solved using a combination of motion prediction (Kalman filtering) and appearance similarity metrics.
 
 SORT (Simple Online and Realtime Tracking) [12] established the foundation for this approach by combining a Kalman filter for motion estimation with the Hungarian algorithm for bounding box association based on Intersection over Union (IoU). SORT's simplicity enables real-time operation but suffers from identity switches when objects undergo occlusion.
+
+The IoU metric, central to both object detection evaluation and tracking association, is defined as the ratio of the area of intersection to the area of union between two bounding boxes $A$ and $B$:
+
+$$
+\text{IoU}(A, B) = \frac{|A \cap B|}{|A \cup B|} = \frac{|A \cap B|}{|A| + |B| - |A \cap B|} \tag{2.1}
+$$
+
+An IoU of 1.0 indicates perfect overlap, while an IoU of 0.0 indicates no overlap. In tracking, two bounding boxes are associated as the same object if their IoU exceeds a configured threshold $\tau_{\text{IoU}}$ (set to 0.30 in this work).
 
 ### 2.4.2 ByteTrack
 
@@ -85,6 +93,45 @@ The reviewed literature reveals three consistent limitations:
 3. **No conversational interface.** All reviewed systems provide dashboard-style visualization but lack natural language query capabilities for non-technical site managers.
 
 This work addresses all three limitations through the Sentry-Judge architecture (absence verification), the Agentic Reporter (alert consolidation), and the Violation Chatbot (natural language queries).
+
+
+## 2.5a Evaluation Metrics: Formal Definitions
+
+The performance of object detection systems is evaluated using standard metrics derived from the confusion matrix. Let TP, FP, and FN denote the number of True Positives, False Positives, and False Negatives respectively at a given confidence threshold. The primary metrics used throughout this thesis are defined as follows.
+
+**Precision** measures the proportion of positive detections that are correct:
+
+$$
+\text{Precision} = \frac{TP}{TP + FP} \tag{2.2}
+$$
+
+**Recall** (also called Sensitivity) measures the proportion of actual positive objects that are detected:
+
+$$
+\text{Recall} = \frac{TP}{TP + FN} \tag{2.3}
+$$
+
+**F1 Score** is the harmonic mean of Precision and Recall, providing a single balanced measure:
+
+$$
+F_1 = 2 \cdot \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}} = \frac{2 \cdot TP}{2 \cdot TP + FP + FN} \tag{2.4}
+$$
+
+**Average Precision (AP)** for a single class is computed as the area under the Precision-Recall (PR) curve, approximated by the interpolated 11-point average:
+
+$$
+AP = \int_0^1 p(r)\, dr \approx \frac{1}{11} \sum_{r \in \{0, 0.1, \ldots, 1.0\}} p_{\text{interp}}(r) \tag{2.5}
+$$
+
+where $p_{\text{interp}}(r) = \max_{\tilde{r} \geq r} p(\tilde{r})$ is the maximum precision at any recall $\tilde{r} \geq r$.
+
+**mean Average Precision (mAP@50)** averages the AP across all $C$ detection classes evaluated at an IoU threshold of 0.50:
+
+$$
+\text{mAP}\text{@50} = \frac{1}{C} \sum_{c=1}^{C} AP_c \tag{2.6}
+$$
+
+For this work, $C = 5$ (helmet, vest, person, no-helmet, no-vest).
 
 
 ## 2.6 Large Language Models and Text-to-SQL

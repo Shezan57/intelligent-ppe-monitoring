@@ -7,14 +7,25 @@ This chapter presents the experimental evaluation of the Intelligent PPE Complia
 
 ## 5.2 Evaluation Metrics
 
-The following standard object detection metrics are used throughout this chapter:
+The following standard object detection metrics are used throughout this chapter. Formal mathematical definitions are provided in Section 2.5a; the metrics as applied to the experimental results are recalled here for clarity.
 
-- **mAP@50 (mean Average Precision at IoU=0.50):** The primary benchmark metric. Measures the area under the Precision-Recall curve at a 50% IoU overlap threshold.
-- **mAP@50-95:** Average mAP across IoU thresholds from 0.50 to 0.95 in steps of 0.05. A stricter measure of localization accuracy.
-- **Precision (P):** The proportion of positive detections that are correct.
-- **Recall (R):** The proportion of true positive objects that are successfully detected.
-- **F1 Score:** The harmonic mean of Precision and Recall.
-- **Frames Per Second (FPS):** Inference throughput, measured as the number of frames processed per second.
+The F1 score at a given confidence threshold $\tau$ is computed as:
+
+$$
+F_1(\tau) = \frac{2 \cdot P(\tau) \cdot R(\tau)}{P(\tau) + R(\tau)} \tag{5.1}
+$$
+
+The strict localization metric mAP@50-95 is the mean of mAP values computed across IoU thresholds $\{0.50, 0.55, 0.60, \ldots, 0.95\}$:
+
+$$
+\text{mAP@50-95} = \frac{1}{10} \sum_{k=0}^{9} \text{mAP}_{\text{@}(0.50 + 0.05k)} \tag{5.2}
+$$
+
+- **mAP@50:** Primary benchmark — area under PR curve at IoU = 0.50.
+- **Precision (P):** Proportion of positive detections that are correct.
+- **Recall (R):** Proportion of actual objects that are detected.
+- **F1 Score:** Harmonic mean of Precision and Recall (Eq. 5.1).
+- **Frames Per Second (FPS):** Inference throughput, to be measured experimentally (see `experiments_to_run.md`).
 
 
 ## 5.3 Experiment 1: Baseline vs. Combined Dataset Model
@@ -46,7 +57,7 @@ Table 5.1 presents the overall detection performance of both models on the test 
 
 **Key finding:** The Combined Model achieves higher recall (+2.6%) and mAP@50-95 (+1.7%) despite a slight reduction in mAP@50. This indicates improved localization precision and reduced missed detections — both critical properties for a safety monitoring system where false negatives (workers without PPE going undetected) carry direct safety consequences.
 
-Importantly, real-world deployment trials confirmed that the Combined Model correctly identified ambiguous edge cases (workers partially occluded by scaffolding, workers at low viewing angles) at a confidence threshold of 0.25, whereas the Baseline Model failed to produce detections at the same threshold. This demonstrates the generalization benefit of incorporating varied person-specific training data, consistent with findings in related literature [17].
+> **[PLACEHOLDER — Table 5.1 values to be updated with actual model.val() outputs. Run Experiment 2 from `experiments_to_run.md` to obtain verified Precision/Recall/mAP numbers for both Baseline and Combined models on the held-out test split.]**
 
 
 ## 5.4 Experiment 2: Per-Class AP Analysis
@@ -69,7 +80,9 @@ Table 5.2 presents the Average Precision (AP@50) for each class across both mode
 
 2. **`person` AP dropped** from 85.3% to 83.1% in the Combined Model. This is attributed to domain mismatch: the 2,550 additional person images included non-construction stock photography, introducing a distribution shift that reduced precision for the base `person` class. This finding underscores the risk of naive data augmentation without careful domain alignment.
 
-3. **`helmet` class reached 93.1%** in the Baseline Model — the highest AP of any class — confirming that helmet presence detection is well-solved by the trained architecture.
+3. **`helmet` class reached 93.1%** in the Baseline Model — the highest AP of any class — confirming that helmet presence detection is well-solved by the trained YOLO26m architecture.
+
+> **[PLACEHOLDER — Table 5.2 per-class values to be updated with actual per-class AP from model.val() output. Run Experiment 3 from `experiments_to_run.md`.]**
 
 *[Insert Figure 5.2: D12_PR_curve.png — Precision-Recall Curves (All Classes)]*
 *[Insert Figure 5.3: D12b_F1_curve.png — F1-Confidence Curves (All Classes)]*
@@ -123,7 +136,13 @@ To characterize the real-world load distribution across the five triage paths, i
 | Path 5 | Critical (both missing) | 373 | 2.1% | Yes |
 | | **Total** | **18,000** | **100%** | |
 
-**Key finding:** Paths 1 and 2 together accounted for 83.6% of all detections, confirming the system's ability to resolve the majority of cases without SAM invocation. Only 16.4% of detections required SAM verification, which — combined with the 5-minute cooldown — keeps the verification queue well within the Judge's processing capacity.
+> **[PLACEHOLDER — Table 5.4 values to be updated with actual path distribution counts. Run Experiment 5 from `experiments_to_run.md` and replace detection counts and percentages with measured values.]**
+
+The SAM bypass rate (percentage of detections resolved via Paths 1 and 2 without SAM invocation) can be expressed mathematically as:
+
+$$
+\text{Bypass Rate} = \frac{N_{\text{path1}} + N_{\text{path2}}}{N_{\text{total}}} \times 100\% \tag{5.3}
+$$
 
 
 ## 5.8 Experiment 6: System Latency Profiling
@@ -142,7 +161,7 @@ Table 5.5 presents the measured processing latency for each stage of the pipelin
 | SAM verification (per ROI) | ~800 ms | Async — does not block Sentry |
 | Database write (per violation) | 2.3 ms | Async |
 
-**Key finding:** The Sentry pipeline completes well within the 33 ms per-frame budget required for 30 FPS operation, with ~47 FPS theoretical capacity. The SAM verification latency of ~800 ms per ROI is entirely absorbed by the asynchronous consumer thread and does not affect the real-time video output.
+> **[PLACEHOLDER — Table 5.5 values to be updated with actual measured latencies. Run Experiments 1 and 4 from `experiments_to_run.md` to obtain real FPS and SAM latency values for your hardware configuration.]**
 
 
 ## 5.9 Sample Detection Outputs
@@ -159,4 +178,4 @@ Qualitative inspection of the sample outputs confirms that the model correctly l
 
 ## 5.10 Chapter Summary
 
-This chapter presented six experiments evaluating the Intelligent PPE Compliance Monitoring System. The Combined Model achieved 89.3% mAP@50, 65.9% mAP@50-95, and 92.3% AP for the safety-critical `no-helmet` class. Confidence threshold analysis identified 0.25 as the balanced operating point and 0.30 as the precision-optimized default. The five-path triage analysis confirmed that 83.6% of detections are resolved without SAM invocation. System latency profiling demonstrated that the Sentry pipeline achieves ~47 FPS on a T4 GPU, comfortably meeting the 30 FPS real-time requirement. Together, these results validate the system's design objectives.
+This chapter presented six experiments evaluating the Intelligent PPE Compliance Monitoring System. The Combined YOLO26m model achieved 89.3% mAP@50 and 65.9% mAP@50-95 from training logs, with per-class AP peaking at the safety-critical `no-helmet` class. Confidence threshold analysis — using Eq. 5.1 to compute F1 across six thresholds — identified 0.25 as the balanced operating point and 0.30 as the precision-optimized default. The bypass rate formula (Eq. 5.3) quantifies the proportion of detections resolved without SAM invocation. Experiments 5–6 (5-path distribution and system latency) will be updated with real measured values upon completion of the hardware benchmarks detailed in `experiments_to_run.md`.

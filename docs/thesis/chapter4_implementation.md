@@ -62,13 +62,13 @@ To assess the impact of data augmentation, an additional 2,550 person-specific i
 
 ### 4.3.1 Training Configuration
 
-The YOLOv11 model [7] was trained using the Ultralytics training pipeline. The model variant selected was the medium-size architecture (`yolo11m`), chosen for its balance between parameter count and accuracy. Training was performed on a cloud GPU instance. Table 4.2 summarizes the key training hyperparameters.
+The YOLO26m model [7] was trained using the Ultralytics training pipeline. Training was performed on a GPU instance. Table 4.2 summarizes the key training hyperparameters.
 
-**Table 4.2: YOLOv11 Training Configuration**
+**Table 4.2: YOLO26m Training Configuration**
 
 | Parameter | Value |
 |-----------|-------|
-| Model architecture | YOLOv11m (medium) |
+| Model architecture | YOLO26m |
 | Input image resolution | 640 × 640 pixels |
 | Epochs | 50 |
 | Batch size | 16 |
@@ -86,7 +86,29 @@ The YOLOv11 model [7] was trained using the Ultralytics training pipeline. The m
 
 Training curves show consistent improvement across all metrics over 50 epochs. The classification loss, which started at 2.22 in epoch 1, decreased to 0.36 by epoch 50, indicating strong model convergence. The mAP@50 metric improved from 0.637 (epoch 1) to 0.893 (epoch 50), demonstrating stable learning without overfitting.
 
-A notable inflection point occurs at epoch 41, where the classification loss drops sharply from 0.66 to 0.45 in a single epoch. This corresponds to the cosine annealing scheduler reaching its minimum learning rate, after which the optimizer makes smaller, more precise parameter updates.
+The total training loss $\mathcal{L}_{\text{total}}$ is defined as a weighted combination of three component losses:
+
+$$
+\mathcal{L}_{\text{total}} = \lambda_{\text{box}} \cdot \mathcal{L}_{\text{box}} + \lambda_{\text{cls}} \cdot \mathcal{L}_{\text{cls}} + \lambda_{\text{dfl}} \cdot \mathcal{L}_{\text{dfl}} \tag{4.1}
+$$
+
+The bounding box regression employs Distribution Focal Loss (DFL) [6], which models the predicted box coordinates as a discrete probability distribution over a fixed set of regression values. DFL outperforms traditional L1/L2 regression losses by capturing the ambiguity in bounding box ground truth labels:
+
+$$
+\mathcal{L}_{\text{dfl}}(S_i) = -\left( (y_{i+1} - y) \log S_i + (y - y_i) \log S_{i+1} \right) \tag{4.2}
+$$
+
+where $y$ is the target box coordinate, $y_i$ and $y_{i+1}$ are the nearest discrete regression values, and $S_i$ is the predicted probability for value $y_i$.
+
+The classification loss uses Binary Cross-Entropy (BCE) computed independently for each of the $C = 5$ classes:
+
+$$
+\mathcal{L}_{\text{cls}} = -\frac{1}{N} \sum_{n=1}^{N} \sum_{c=1}^{C} \left[ y_{n,c} \log \hat{y}_{n,c} + (1 - y_{n,c}) \log (1 - \hat{y}_{n,c}) \right] \tag{4.3}
+$$
+
+where $y_{n,c} \in \{0, 1\}$ is the ground truth label and $\hat{y}_{n,c} \in (0, 1)$ is the predicted class probability for anchor $n$ and class $c$.
+
+A notable inflection point occurs at epoch 41, where the classification loss drops sharply from 0.6660 to 0.4537 — a 31.8% single-epoch reduction. This corresponds to the cosine annealing scheduler reaching its minimum learning rate, after which the optimizer makes smaller, more precise parameter updates.
 
 
 ## 4.4 Backend Implementation
@@ -155,4 +177,4 @@ The chatbot service (`chatbot_service.py`) implements the text-to-SQL pipeline d
 
 ## 4.7 Chapter Summary
 
-This chapter described the complete implementation of the Intelligent PPE Compliance Monitoring System. The dataset was assembled from seven source datasets totaling 29,053 images after sanitization, standardized to a five-class schema, and used to train a YOLOv11m model for 50 epochs. The backend provides a modular Python service architecture built on FastAPI, with SQLAlchemy for persistence and Pydantic for configuration management. The frontend provides a React-based dashboard with image, video, history, and chatbot interfaces. Taken together, these components form a deployable system that addresses the three core limitations identified in Chapter 1.
+This chapter described the complete implementation of the Intelligent PPE Compliance Monitoring System. The dataset was assembled from seven source datasets totaling 29,053 images after sanitization, standardized to a five-class schema, and used to train a YOLO26m model for 50 epochs. The training objective (Eq. 4.1) combines DFL bounding box regression (Eq. 4.2) and multi-class Binary Cross-Entropy (Eq. 4.3), optimized using AdamW with cosine annealing. The backend provides a modular Python service architecture built on FastAPI, with SQLAlchemy for persistence and Pydantic for configuration management. The frontend provides a React-based dashboard with image, video, history, and chatbot interfaces.

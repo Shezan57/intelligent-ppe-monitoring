@@ -26,15 +26,27 @@ The Sentry serves as the real-time front-end of the detection pipeline. It is re
 
 ### 3.3.1 Object Detection
 
-The Sentry employs a YOLOv11 model [7] trained on a unified five-class schema: `helmet`, `vest`, `person`, `no-helmet`, and `no-vest`. The model operates at an input resolution of 640×640 pixels with a confidence threshold of 0.30. The YOLO architecture was selected for its single-stage inference efficiency, which consistently achieves throughput exceeding 30 frames per second on consumer-grade GPUs [5][6].
+The Sentry employs a YOLO26m model [7] trained on a unified five-class schema: `helmet`, `vest`, `person`, `no-helmet`, and `no-vest`. The model operates at an input resolution of 640×640 pixels with a confidence threshold of 0.30. The YOLO architecture was selected for its single-stage inference efficiency, which consistently achieves real-time throughput on consumer-grade GPUs [5][6].
 
-The detection output for each frame consists of a set of bounding boxes, each annotated with a class label and a confidence score. These bounding boxes are then grouped by spatial proximity: each detected `person` bounding box is associated with any overlapping PPE or violation-class bounding boxes using Intersection over Union (IoU) matching with a threshold of 0.30.
+The detection output for each frame consists of a set of bounding boxes, each annotated with a class label and a confidence score. These bounding boxes are then grouped by spatial proximity: each detected `person` bounding box is associated with any overlapping PPE or violation-class bounding box if their IoU exceeds a threshold $\tau_{\text{assoc}}$:
+
+$$
+\text{associate}(p, d) = \begin{cases} \text{true} & \text{if } \text{IoU}(B_p, B_d) \geq \tau_{\text{assoc}} \\ \text{false} & \text{otherwise} \end{cases} \quad (\tau_{\text{assoc}} = 0.30) \tag{3.1}
+$$
+
+where $B_p$ is the bounding box of the detected person and $B_d$ is the bounding box of the detected PPE or violation class.
 
 ### 3.3.2 Person Tracking and Cooldown Logic
 
 To prevent redundant processing of the same individual across consecutive frames, the Sentry incorporates a custom IoU-based tracker that assigns persistent identifiers to detected persons. Unlike general-purpose multi-object trackers such as ByteTrack [10] or BoT-SORT [11], which are optimized for pedestrian re-identification in surveillance scenarios, this tracker is specifically tuned for the construction site domain where workers remain relatively stationary within camera zones.
 
-Each tracked person is subject to a cooldown timer of 300 seconds (5 minutes). Once a worker has been evaluated and forwarded to the Judge, the same individual will not be re-evaluated for the duration of the cooldown period, regardless of how many subsequent frames they appear in. This mechanism reduces the Judge's workload by approximately 99.4%, since a person appearing at 30 FPS would otherwise generate 9,000 evaluation requests per 5-minute window.
+Each tracked person is subject to a cooldown timer of $T_c = 300$ seconds (5 minutes). Once a worker evaluated and forwarded to the Judge, the same individual will not be re-evaluated for the duration of the cooldown period. Formally, a person with identifier $i$ is eligible for evaluation only if:
+
+$$
+t_{\text{now}} - t_{\text{last\_eval}}(i) \geq T_c \quad \text{where } T_c = 300 \text{ s} \tag{3.2}
+$$
+
+This mechanism ensures that each worker is assessed at most once per 5-minute window, preventing duplicate violations being raised for the same sustained non-compliance event.
 
 ### 3.3.3 Five-Path Intelligent Triage
 
@@ -48,11 +60,23 @@ The five paths are defined as follows:
 
 **Path 2 — Fast Violation.** The `no-helmet` class is detected with high confidence. Since the YOLO model was explicitly trained on negative examples, this constitutes a direct violation. No SAM verification is required.
 
-**Path 3 — Rescue Head.** A `person` is detected but neither `helmet` nor `no-helmet` appears in the detection output. The system cannot determine helmet status from the YOLO output alone. The head region of interest (top 40% of the person bounding box) is cropped and forwarded to the Judge for SAM verification.
+**Path 3 — Rescue Head.** A `person` is detected but neither `helmet` nor `no-helmet` appears in the detection output. The system cannot determine helmet status from the YOLO output alone. The head region of interest is cropped using the following bounding box extraction formula, where $(x_1, y_1, x_2, y_2)$ are the coordinates of the person bounding box:
 
-**Path 4 — Rescue Body.** Analogous to Path 3, but for vest detection. The torso region of interest (20%–60% of the person bounding box height) is cropped and forwarded to the Judge for SAM verification.
+$$
+ROI_{\text{head}} = \left(x_1,\ y_1,\ x_2,\ y_1 + 0.4 \cdot (y_2 - y_1)\right) \tag{3.3}
+$$
 
-**Path 5 — Critical.** Neither helmet nor vest status can be determined from the YOLO output. Both head and torso regions are cropped and forwarded to the Judge.
+The cropped head ROI is forwarded to the Judge for SAM verification.
+
+**Path 4 — Rescue Body.** Analogous to Path 3, but for vest detection. The torso ROI is defined as:
+
+$$
+ROI_{\text{torso}} = \left(x_1,\ y_1 + 0.2 \cdot h,\ x_2,\ y_1 + 0.6 \cdot h\right) \quad \text{where } h = y_2 - y_1 \tag{3.4}
+$$
+
+This region covers the upper-middle torso area where high-visibility vests are worn.
+
+**Path 5 — Critical.** Neither helmet nor vest status can be determined from the YOLO output. Both ROI extractions (Equations 3.3 and 3.4) are applied and both regions forwarded to the Judge.
 
 Empirical analysis of the detection distribution indicates that approximately 80% of all detections are resolved through Paths 1 and 2, requiring no SAM invocation. This bypass rate is a key factor in the system's ability to operate within the computational budget of a single-GPU deployment.
 
@@ -73,10 +97,18 @@ The Judge employs the Segment Anything Model (SAM) [8] to perform dense semantic
 
 The verification process proceeds as follows:
 
-1. The cropped ROI is passed to SAM without prompt points, generating an automatic mask.
-2. The mask coverage ratio is computed: the proportion of the ROI area occupied by the segmented object.
-3. If the mask coverage falls below a threshold of 5%, the PPE item is classified as absent, and the violation is confirmed.
-4. If the mask coverage exceeds the threshold, the PPE item is classified as present, and the detection is discarded as a false alarm.
+1. The cropped ROI is passed to SAM without prompt points, generating an automatic segmentation mask $M$.
+2. The mask coverage ratio $\rho$ is computed as the proportion of the ROI area occupied by the foreground mask:
+
+$$
+\rho = \frac{|M_{\text{fg}}|}{|ROI|} = \frac{\sum_{(x,y) \in ROI} \mathbb{1}[M(x,y) = 1]}{W_{ROI} \times H_{ROI}} \tag{3.5}
+$$
+
+3. The PPE item is classified as **absent** (violation confirmed) if $\rho < \tau_{\text{SAM}}$, otherwise **present** (false alarm discarded):
+
+$$
+\text{verdict} = \begin{cases} \text{VIOLATION} & \text{if } \rho < \tau_{\text{SAM}} \\ \text{COMPLIANT} & \text{if } \rho \geq \tau_{\text{SAM}} \end{cases} \quad (\tau_{\text{SAM}} = 0.05) \tag{3.6}
+$$
 
 Figure 3.4 presents the SAM verification process as a sequence diagram.
 
@@ -151,4 +183,4 @@ The frontend communicates with the backend exclusively through RESTful API endpo
 
 ## 3.9 Chapter Summary
 
-This chapter presented the architectural design of the Intelligent PPE Compliance Monitoring System. The key design contribution is the decoupled Sentry-Judge pipeline, which resolves the fundamental tension between real-time detection speed (YOLO at ~30 FPS) and verification accuracy (SAM at <1 FPS) by introducing an asynchronous queue between the two stages. The five-path triage logic further optimizes the pipeline by routing approximately 80% of detections through fast-path decisions that require no SAM invocation. The system is complemented by a scheduled LLM-based reporter for daily compliance summaries and a text-to-SQL chatbot for on-demand violation queries.
+This chapter presented the architectural design of the Intelligent PPE Compliance Monitoring System. The key design contribution is the decoupled Sentry-Judge pipeline, which resolves the fundamental tension between real-time detection speed (YOLO26m) and verification accuracy (SAM) by introducing an asynchronous queue between the two stages. The formal definitions of the IoU association rule (Eq. 3.1), cooldown eligibility (Eq. 3.2), ROI extraction bounds (Eqs. 3.3–3.4), and SAM coverage ratio threshold (Eqs. 3.5–3.6) together constitute the complete algorithmic specification of the triage system. The system is complemented by a scheduled LLM-based reporter for daily compliance summaries and a text-to-SQL chatbot for on-demand violation queries.
