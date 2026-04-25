@@ -1,0 +1,14 @@
+1. https://universe.roboflow.com/huiyao-hu-sj18e/construction-ppe-detection/dataset/1
+
+2. https://universe.roboflow.com/construction-plxig/construction-ppe-detection-oiysp/dataset/2
+
+3. https://universe.roboflow.com/human-posture/construction-worker-ppe/dataset/1
+
+4. https://universe.roboflow.com/gaos-workspace/construction-ppe-qofi4/dataset/1
+
+5. https://universe.roboflow.com/construction-propn/safety-akucz/dataset/1
+
+6. https://universe.roboflow.com/envisage/construction-rineu/dataset/3
+
+This below dataset was a constructions worker segmentations dataset I converted it as a just a person class detection dataset.
+7. https://universe.roboflow.com/person-detection-pmyzi/construction-person-detection-xc5fz/dataset/1
