@@ -1,0 +1,14 @@
+{
+  "experiment": "Full Video Pipeline Summary",
+  "video_file": "construction_sites.mp4",
+  "video_resolution": "1280x720",
+  "frames_processed": 1000,
+  "total_detections": 18098,
+  "avg_detections_per_frame": 18.1,
+  "mean_inference_fps": 52.9,
+  "mean_confidence": 0.5988,
+  "violation_frames": 0,
+  "compliant_frames": 1000,
+  "empty_frames": 0,
+  "total_processing_time_sec": 18.89
+}

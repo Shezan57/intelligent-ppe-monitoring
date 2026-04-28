@@ -1,0 +1,10 @@
+{
+  "experiment": "SAM 3 Latency",
+  "status": "SUCCESS",
+  "runs": 20,
+  "mean_ms": 348.0,
+  "min_ms": 298.0,
+  "max_ms": 413.3,
+  "median_ms": 351.4,
+  "p95_ms": 413.3
+}

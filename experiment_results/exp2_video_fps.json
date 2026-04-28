@@ -1,0 +1,13 @@
+{
+  "experiment": "FPS Benchmark (Video)",
+  "video_file": "construction_sites.mp4",
+  "video_resolution": "1280x720",
+  "video_native_fps": 30.0,
+  "frames_processed": 300,
+  "mean_fps": 55.4,
+  "min_fps": 5.3,
+  "max_fps": 69.2,
+  "mean_ms_per_frame": 20.2,
+  "avg_detections_per_frame": 11.8,
+  "max_detections_single_frame": 15
+}

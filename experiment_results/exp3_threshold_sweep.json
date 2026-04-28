@@ -1,0 +1,62 @@
+[
+  {
+    "threshold": 0.1,
+    "total_detections": 1720,
+    "avg_detections_per_frame": 17.2,
+    "helmet": 1131,
+    "vest": 589,
+    "person": 0,
+    "no-helmet": 0,
+    "no-vest": 0
+  },
+  {
+    "threshold": 0.15,
+    "total_detections": 1447,
+    "avg_detections_per_frame": 14.5,
+    "helmet": 981,
+    "vest": 466,
+    "person": 0,
+    "no-helmet": 0,
+    "no-vest": 0
+  },
+  {
+    "threshold": 0.2,
+    "total_detections": 1288,
+    "avg_detections_per_frame": 12.9,
+    "helmet": 893,
+    "vest": 395,
+    "person": 0,
+    "no-helmet": 0,
+    "no-vest": 0
+  },
+  {
+    "threshold": 0.25,
+    "total_detections": 1178,
+    "avg_detections_per_frame": 11.8,
+    "helmet": 823,
+    "vest": 355,
+    "person": 0,
+    "no-helmet": 0,
+    "no-vest": 0
+  },
+  {
+    "threshold": 0.3,
+    "total_detections": 1092,
+    "avg_detections_per_frame": 10.9,
+    "helmet": 768,
+    "vest": 324,
+    "person": 0,
+    "no-helmet": 0,
+    "no-vest": 0
+  },
+  {
+    "threshold": 0.5,
+    "total_detections": 824,
+    "avg_detections_per_frame": 8.2,
+    "helmet": 596,
+    "vest": 228,
+    "person": 0,
+    "no-helmet": 0,
+    "no-vest": 0
+  }
+]
