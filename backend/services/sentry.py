@@ -208,6 +208,7 @@ class Sentry:
             persist=True,
             tracker="bytetrack.yaml",
             verbose=False,
+            device=self.yolo.device,
         )
 
         annotated = frame.copy()

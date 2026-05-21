@@ -216,35 +216,52 @@ class Judge:
         violation_type: str,
     ) -> tuple:
         """
-        Run SAM 3 verification on the FULL person ROI.
+        Run SAM 3 verification using Geometric Prompt Engineering.
 
-        SAM checks for helmet/vest on the same full crop.
-        No separate head/torso extraction needed.
+        Mirrors the diagnostic (Cell 5) approach:
+        - Helmet check  → HEAD sub-ROI (top 40% of person crop)
+        - Vest check    → TORSO sub-ROI (20%–100% of person crop)
+
+        This is critical: on a full-body crop a helmet covers ~2-4% of pixels,
+        well below τ_SAM=0.05. Sub-ROI cropping brings it into a detectable range.
 
         Returns:
             (confirmed: bool, confidence: float)
             confirmed=True means violation IS real (SAM didn't find the PPE)
         """
-        result = self.sam.verify_ppe_on_crop(roi_image, violation_type)
+        h, w = roi_image.shape[:2]
+
+        # ── Sub-ROI extraction (Geometric Prompt Engineering) ────────────────
+        # Head ROI: top 40% of the person crop
+        head_cut = max(1, int(h * 0.40))
+        head_crop = roi_image[0:head_cut, 0:w]
+
+        # Torso ROI: 20%–100% of the person crop
+        torso_start = max(0, int(h * 0.20))
+        torso_crop = roi_image[torso_start:h, 0:w]
 
         if violation_type == "no_helmet":
+            result = self.sam.verify_ppe_on_crop(head_crop, "no_helmet")
             helmet_found = result.get("helmet_found", False)
             confidence = result.get("helmet_confidence", 0.0)
             return (not helmet_found, confidence)
 
         elif violation_type == "no_vest":
+            result = self.sam.verify_ppe_on_crop(torso_crop, "no_vest")
             vest_found = result.get("vest_found", False)
             confidence = result.get("vest_confidence", 0.0)
             return (not vest_found, confidence)
 
         elif violation_type == "both_missing":
-            helmet_found = result.get("helmet_found", False)
-            vest_found = result.get("vest_found", False)
+            helmet_result = self.sam.verify_ppe_on_crop(head_crop, "no_helmet")
+            vest_result   = self.sam.verify_ppe_on_crop(torso_crop, "no_vest")
+            helmet_found = helmet_result.get("helmet_found", False)
+            vest_found   = vest_result.get("vest_found", False)
             avg_conf = (
-                result.get("helmet_confidence", 0) +
-                result.get("vest_confidence", 0)
+                helmet_result.get("helmet_confidence", 0.0) +
+                vest_result.get("vest_confidence", 0.0)
             ) / 2
-            # Confirmed if at least one is still missing
+            # Confirmed if at least one item is still missing
             confirmed = not (helmet_found and vest_found)
             return (confirmed, avg_conf)
 

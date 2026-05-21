@@ -79,9 +79,9 @@ RULES:
 2. Always use SQLite-compatible syntax.
 3. For date filtering, use date() and datetime() functions.
 4. Keep queries simple and efficient.
-5. When the user asks about "today", use date('now').
-6. When the user asks about "this week", use date('now', '-7 days').
-7. When the user asks about "this month", use date('now', 'start of month').
+5. When the user asks about "today", use date('now', 'localtime').
+6. When the user asks about "this week", use date('now', 'localtime', '-7 days').
+7. When the user asks about "this month", use date('now', 'localtime', 'start of month').
 8. Return results in a friendly, conversational tone suitable for a site manager.
 9. If the question cannot be answered from the database, say so politely.
 10. IMPORTANT — Table usage:
@@ -90,8 +90,8 @@ RULES:
       * "verified_violations" — written by the Sentry-Judge pipeline (the main demo workflow)
     - When counting or listing violations, ALWAYS query BOTH tables and SUM the results.
       Example for total today:
-        SELECT (SELECT COUNT(*) FROM violations WHERE date(timestamp)=date('now'))
-             + (SELECT COUNT(*) FROM verified_violations WHERE date(timestamp)=date('now'))
+        SELECT (SELECT COUNT(*) FROM violations WHERE date(timestamp)=date('now','localtime'))
+             + (SELECT COUNT(*) FROM verified_violations WHERE date(timestamp)=date('now','localtime'))
              AS total_violations
     - Use verified_violations for questions about SAM confidence, judge confirmation, person_id, camera_zone.
     - Use violations for questions about site_location, camera_id, sam_activated, detection_confidence.
