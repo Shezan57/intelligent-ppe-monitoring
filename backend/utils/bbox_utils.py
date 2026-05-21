@@ -215,3 +215,73 @@ def get_bbox_area(bbox: List[float]) -> float:
     """
     x_min, y_min, x_max, y_max = bbox
     return max(0, (x_max - x_min) * (y_max - y_min))
+
+
+def get_required_aspect_ratio(
+    h: float, w: float,
+    strict: float = None,
+    lenient: float = None,
+    dim_low: int = None,
+    dim_high: int = None,
+) -> float:
+    """
+    Dynamically compute the minimum h/w aspect ratio for a person ROI.
+
+    Smaller crops need a stricter (higher) ratio — a tiny nearly-square
+    blob is almost never a person, but a large close-up can be.
+
+    Uses settings defaults if parameters not provided.
+
+    Args:
+        h: Crop height in pixels
+        w: Crop width in pixels
+        strict: Required h/w for tiny crops (default from settings)
+        lenient: Required h/w for large crops (default from settings)
+        dim_low: Below this min_dim → use strict ratio
+        dim_high: Above this min_dim → use lenient ratio
+
+    Returns:
+        Required minimum h/w aspect ratio
+    """
+    strict = strict if strict is not None else settings.aspect_ratio_strict
+    lenient = lenient if lenient is not None else settings.aspect_ratio_lenient
+    dim_low = dim_low if dim_low is not None else settings.aspect_dim_low
+    dim_high = dim_high if dim_high is not None else settings.aspect_dim_high
+
+    min_dim = min(h, w)
+    if min_dim <= dim_low:
+        return strict
+    elif min_dim >= dim_high:
+        return lenient
+    else:
+        # Linear interpolation between strict and lenient
+        t = (min_dim - dim_low) / (dim_high - dim_low)
+        return strict + t * (lenient - strict)
+
+
+def passes_person_filters(bbox: List[float]) -> tuple:
+    """
+    Check if a person bbox passes the dynamic aspect ratio and min area filters.
+
+    Args:
+        bbox: Person bounding box [x_min, y_min, x_max, y_max]
+
+    Returns:
+        (passes: bool, reason: str or None)
+        reason is set only when passes=False
+    """
+    bw = bbox[2] - bbox[0]
+    bh = bbox[3] - bbox[1]
+    area = bw * bh
+    aspect_ratio = bh / bw if bw > 0 else 0
+
+    # Min area check
+    if area < settings.min_person_area:
+        return False, f"Too small (area {area:.0f}px² < {settings.min_person_area})"
+
+    # Dynamic aspect ratio check
+    required = get_required_aspect_ratio(bh, bw)
+    if aspect_ratio < required:
+        return False, f"Bad aspect ratio {aspect_ratio:.2f} < {required:.2f} (machine/vehicle)"
+
+    return True, None

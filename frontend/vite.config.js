@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react'
 // Local dev:  http://localhost:8000
 // Colab:      your ngrok URL from Cell 10
 const BACKEND_URL = 'https://chalkiest-shavonda-swimmingly.ngrok-free.dev'
+// 'http://localhost:8000'
 // ─────────────────────────────────────────────────────────────────
 
 // https://vitejs.dev/config/

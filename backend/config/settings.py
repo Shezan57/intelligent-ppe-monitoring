@@ -57,6 +57,32 @@ class Settings(BaseSettings):
         description="Minimum mask coverage for SAM verification (5%)"
     )
     
+    # ===== Person Validation (from diagnostic pipeline) =====
+    person_min_coverage: float = Field(
+        default=0.10,
+        description="Minimum SAM mask coverage to confirm ROI is a person"
+    )
+    min_person_area: int = Field(
+        default=3000,
+        description="Minimum pixel area for a person crop (below = too small)"
+    )
+    aspect_ratio_strict: float = Field(
+        default=1.4,
+        description="Required h/w ratio for tiny crops (≤50px min dim)"
+    )
+    aspect_ratio_lenient: float = Field(
+        default=0.8,
+        description="Required h/w ratio for large crops (≥250px min dim)"
+    )
+    aspect_dim_low: int = Field(
+        default=50,
+        description="Min dimension threshold for strict aspect ratio"
+    )
+    aspect_dim_high: int = Field(
+        default=250,
+        description="Min dimension threshold for lenient aspect ratio"
+    )
+    
     # ===== Email (SMTP) =====
     smtp_server: str = Field(
         default="smtp.gmail.com",
@@ -132,11 +158,18 @@ class Settings(BaseSettings):
         default=0.2,
         description="Start of torso ROI (20% from top)"
     )
-    
+
+    # ===== Chatbot / Reporter =====
+    openai_api_key: str = Field(
+        default="",
+        description="OpenAI or OpenRouter API key"
+    )
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"
     
     def get_manager_emails_list(self) -> List[str]:
         """Parse manager emails from JSON string to list."""

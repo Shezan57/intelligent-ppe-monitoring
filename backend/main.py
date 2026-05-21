@@ -16,6 +16,9 @@ import os
 import sys
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+load_dotenv(override=True)  # Force .env values over any existing system env vars
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -25,7 +28,7 @@ from fastapi.responses import JSONResponse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config.settings import settings
-from api.routes import detection_router, upload_router, history_router, video_router, chatbot_router
+from api.routes import detection_router, upload_router, history_router, video_router, chatbot_router, reports_router
 from database.connection import engine
 from database.models import create_tables
 
@@ -52,6 +55,17 @@ async def lifespan(app: FastAPI):
     # Create database tables
     print("📦 Creating database tables...")
     create_tables(engine)
+
+    # Migrate: add cropped_roi_path column if not exists (SQLite doesn't support IF NOT EXISTS)
+    try:
+        with engine.connect() as conn:
+            conn.execute(__import__('sqlalchemy').text(
+                "ALTER TABLE violations ADD COLUMN cropped_roi_path VARCHAR(500)"
+            ))
+            conn.commit()
+            print("✅ Migrated: added cropped_roi_path column")
+    except Exception:
+        pass  # Column already exists
     
     # Pre-load models (optional - can be lazy loaded)
     if not settings.debug:
@@ -168,6 +182,7 @@ app.include_router(upload_router)
 app.include_router(history_router)
 app.include_router(video_router)
 app.include_router(chatbot_router)
+app.include_router(reports_router)
 
 
 # === Static Files ===

@@ -32,9 +32,12 @@ HOW SESSION ENDS:
 
 import json
 import logging
+import os
 from datetime import datetime, date
 from typing import Dict, Any, Optional, List
 
+import cv2
+import numpy as np
 from sqlalchemy.orm import Session
 
 from database.models import Violation
@@ -271,6 +274,9 @@ class ViolationCollector:
         Returns:
             New Violation ORM object (not yet committed)
         """
+        # Crop person ROI for evidence gallery
+        cropped_roi_path = self._save_person_roi(image_path, person.get("bbox", []), now)
+
         return Violation(
             # Timestamp (when session started)
             timestamp=now,
@@ -288,6 +294,7 @@ class ViolationCollector:
             # Evidence
             original_image_path=image_path,
             annotated_image_path=annotated_path,
+            cropped_roi_path=cropped_roi_path,
 
             # System details
             decision_path=person.get("decision_path", "Unknown"),
@@ -306,6 +313,39 @@ class ViolationCollector:
             total_duration_minutes=0.0,
             is_active_session=True
         )
+
+    def _save_person_roi(
+        self,
+        image_path: Optional[str],
+        bbox: list,
+        now: datetime
+    ) -> Optional[str]:
+        """Crop person bounding box from the original image and save as ROI evidence."""
+        if not image_path or not bbox or len(bbox) != 4:
+            return None
+        try:
+            img = cv2.imread(image_path)
+            if img is None:
+                return None
+            h, w = img.shape[:2]
+            x1, y1, x2, y2 = [int(c) for c in bbox]
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(w, x2), min(h, y2)
+            if x2 <= x1 or y2 <= y1:
+                return None
+            roi = img[y1:y2, x1:x2]
+
+            # Save to uploads/roi/
+            uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads", "roi")
+            os.makedirs(uploads_dir, exist_ok=True)
+            filename = f"roi_{now.strftime('%Y%m%d_%H%M%S_%f')}.jpg"
+            save_path = os.path.join(uploads_dir, filename)
+            cv2.imwrite(save_path, roi)
+            # Return URL path (served by StaticFiles at /uploads/)
+            return f"/uploads/roi/{filename}"
+        except Exception as e:
+            logger.warning(f"Failed to save person ROI: {e}")
+            return None
 
     def close_inactive_sessions(self, site: str = None, camera: str = None) -> int:
         """

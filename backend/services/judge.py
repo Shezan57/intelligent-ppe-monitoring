@@ -145,22 +145,45 @@ class Judge:
             self.stats["errors"] += 1
             return
 
-        # === Run SAM 3 verification ===
+        # === GATE 1: Dynamic aspect ratio + min area ===
+        from utils.bbox_utils import passes_person_filters
+        roi_h, roi_w = roi_image.shape[:2]
+        # Build a pseudo-bbox for the ROI crop
+        roi_bbox = [0, 0, roi_w, roi_h]
+        passes, reject_reason = passes_person_filters(roi_bbox)
+        if not passes:
+            self.stats["not_person_rejected"] += 1
+            logger.info(f"Judge REJECTED (pre-filter): Person {person_id} - {reject_reason}")
+            print(f"  Judge REJECTED (pre-filter): Person {person_id} - {reject_reason}")
+            if self.roi_cleanup and os.path.exists(roi_path):
+                os.remove(roi_path)
+            return
+
+        # === GATE 2: SAM person verification ===
         confirmed = False
         judge_confidence = 0.0
 
         if self.sam.is_mock():
-            # Mock mode: use dummy verification
-            result = self.sam._mock_verification(
-                "helmet" if "helmet" in violation_type else "vest"
-            )
-            # In mock mode, confirm all violations (for testing)
+            # Mock mode: confirm all violations for testing
             confirmed = True
             judge_confidence = 0.5
         else:
-            # Real SAM 3 verification
+            # Real SAM: check if this is actually a person
+            is_person, person_cov = self.sam.verify_is_person(roi_image)
+            if not is_person:
+                self.stats["not_person_rejected"] += 1
+                logger.info(
+                    f"Judge REJECTED (not person): Person {person_id} "
+                    f"(SAM person coverage={person_cov:.4f})"
+                )
+                print(f"  Judge REJECTED (not person): Person {person_id} (cov={person_cov:.4f})")
+                if self.roi_cleanup and os.path.exists(roi_path):
+                    os.remove(roi_path)
+                return
+
+            # === GATE 3: SAM PPE verification on full ROI ===
             confirmed, judge_confidence = self._verify_with_sam(
-                roi_image, violation_type, payload.get("person_bbox", [])
+                roi_image, violation_type
             )
 
         processing_time = (time.time() - t0) * 1000
@@ -177,7 +200,7 @@ class Judge:
             )
             print(f"  Judge CONFIRMED: Person {person_id} - {violation_type} ({processing_time:.0f}ms)")
         else:
-            # === REJECTED: Clean up ROI image ===
+            # === REJECTED: SAM found the PPE → clean up ===
             self.stats["rejected"] += 1
             if self.roi_cleanup and os.path.exists(roi_path):
                 os.remove(roi_path)
@@ -187,119 +210,40 @@ class Judge:
             )
             print(f"  Judge REJECTED: Person {person_id} - {violation_type} (SAM found PPE)")
 
-    def _is_person(self, roi_image: np.ndarray) -> bool:
-        """
-        Pre-check: Is this ROI actually a person?
-
-        Two-way verification:
-          1. POSITIVE: SAM searches for 'person/human/worker'
-          2. NEGATIVE: SAM searches for 'machine/building/vehicle'
-        
-        Reject if:
-          - No person found at all, OR
-          - Machine/building confidence > person confidence
-
-        Returns:
-            True if SAM confirms this is a person (not a building/machine)
-        """
-        # Positive check: is there a person?
-        person_result = self.sam._run_sam3_verification(
-            roi_image,
-            ["person", "human", "worker", "man", "woman"],
-            "person"
-        )
-        person_found = person_result.get("person_found", False)
-        person_conf = person_result.get("confidence", 0.0)
-
-        # Negative check: is this a machine/building/object?
-        object_result = self.sam._run_sam3_verification(
-            roi_image,
-            ["machine", "building", "vehicle", "crane", "excavator",
-             "construction equipment", "truck", "wall", "structure"],
-            "object"
-        )
-        object_found = object_result.get("object_found", False)
-        object_conf = object_result.get("confidence", 0.0)
-
-        print(f"    Person check: person={person_found} (conf={person_conf:.3f}), "
-              f"object={object_found} (conf={object_conf:.3f})")
-
-        # Reject if no person found
-        if not person_found:
-            return False
-
-        # Reject if object/machine has higher confidence than person
-        if object_found and object_conf > person_conf:
-            print(f"    -> Object confidence ({object_conf:.3f}) > Person ({person_conf:.3f}): NOT a person")
-            return False
-
-        return True
-
     def _verify_with_sam(
         self,
         roi_image: np.ndarray,
         violation_type: str,
-        person_bbox: list,
     ) -> tuple:
         """
-        Run SAM 3 verification on the ROI.
+        Run SAM 3 verification on the FULL person ROI.
 
-        For 'no_helmet': check if SAM finds a helmet → if YES, reject violation
-        For 'no_vest': check if SAM finds a vest → if YES, reject violation
-        For 'both_missing': check both
+        SAM checks for helmet/vest on the same full crop.
+        No separate head/torso extraction needed.
 
         Returns:
             (confirmed: bool, confidence: float)
             confirmed=True means violation IS real (SAM didn't find the PPE)
         """
-        # === STEP 0: Verify this is actually a person ===
-        if not self._is_person(roi_image):
-            self.stats["not_person_rejected"] += 1
-            print(f"    -> Not a person! Skipping PPE check.")
-            return (False, 0.0)  # Reject — not a real person
+        result = self.sam.verify_ppe_on_crop(roi_image, violation_type)
 
-        # === STEP 1: Check PPE based on violation type ===
         if violation_type == "no_helmet":
-            # SAM checks for helmet in the head ROI
-            result = self.sam._run_sam3_verification(
-                roi_image,
-                ["helmet", "hard hat", "safety helmet"],
-                "helmet"
-            )
             helmet_found = result.get("helmet_found", False)
-            confidence = result.get("confidence", 0.0)
-            # If SAM found a helmet → REJECT (YOLO was wrong)
+            confidence = result.get("helmet_confidence", 0.0)
             return (not helmet_found, confidence)
 
         elif violation_type == "no_vest":
-            result = self.sam._run_sam3_verification(
-                roi_image,
-                ["safety vest", "high visibility vest", "reflective vest"],
-                "vest"
-            )
             vest_found = result.get("vest_found", False)
-            confidence = result.get("confidence", 0.0)
+            confidence = result.get("vest_confidence", 0.0)
             return (not vest_found, confidence)
 
         elif violation_type == "both_missing":
-            # Check both
-            helmet_result = self.sam._run_sam3_verification(
-                roi_image,
-                ["helmet", "hard hat", "safety helmet"],
-                "helmet"
-            )
-            vest_result = self.sam._run_sam3_verification(
-                roi_image,
-                ["safety vest", "high visibility vest", "reflective vest"],
-                "vest"
-            )
-            helmet_found = helmet_result.get("helmet_found", False)
-            vest_found = vest_result.get("vest_found", False)
+            helmet_found = result.get("helmet_found", False)
+            vest_found = result.get("vest_found", False)
             avg_conf = (
-                helmet_result.get("confidence", 0) +
-                vest_result.get("confidence", 0)
+                result.get("helmet_confidence", 0) +
+                result.get("vest_confidence", 0)
             ) / 2
-
             # Confirmed if at least one is still missing
             confirmed = not (helmet_found and vest_found)
             return (confirmed, avg_conf)
@@ -335,7 +279,7 @@ class Judge:
                 judge_processing_time_ms=processing_time,
                 sentry_confidence=payload.get("sentry_confidence"),
                 decision_path=payload.get("decision_path"),
-                person_bbox=payload.get("person_bbox"),
+                person_bbox=payload.get("person_bbox").tolist() if isinstance(payload.get("person_bbox"), np.ndarray) else payload.get("person_bbox"),
             )
             session.add(violation)
             session.commit()

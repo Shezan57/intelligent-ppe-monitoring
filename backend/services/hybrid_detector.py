@@ -235,6 +235,18 @@ class HybridDetector:
         """
         bbox = person["bbox"]
         confidence = person["confidence"]
+
+        # === PRE-FILTER: Dynamic aspect ratio + min area ===
+        from utils.bbox_utils import passes_person_filters
+        passes, reject_reason = passes_person_filters(bbox)
+        if not passes:
+            result, path, used_sam = self._create_result(
+                person_id, bbox, confidence,
+                has_helmet=True, has_vest=True,
+                path=DecisionPath.FAST_SAFE, sam_used=False
+            )
+            return result, path, used_sam, None
+
         helmet_detected = person.get("helmet_detected", False)
         vest_detected = person.get("vest_detected", False)
         no_helmet_detected = person.get("no_helmet_detected", False)
@@ -446,6 +458,9 @@ class HybridDetector:
         """
         Process a single person through 5-path decision logic.
         
+        Includes a dynamic aspect ratio pre-filter to reject machines/vehicles
+        before they enter the triage pipeline.
+        
         Args:
             person: Person detection from YOLO
             image: Full input image
@@ -456,6 +471,19 @@ class HybridDetector:
         """
         bbox = person["bbox"]
         confidence = person["confidence"]
+        
+        # === PRE-FILTER: Dynamic aspect ratio + min area ===
+        from utils.bbox_utils import passes_person_filters
+        passes, reject_reason = passes_person_filters(bbox)
+        if not passes:
+            # Not a person (machine/vehicle/too small) → skip entirely
+            return self._create_result(
+                person_id, bbox, confidence,
+                has_helmet=True,  # Mark as "safe" so it's not a false violation
+                has_vest=True,
+                path=DecisionPath.FAST_SAFE,
+                sam_used=False
+            )
         
         # Get YOLO's PPE detection results
         helmet_detected = person.get("helmet_detected", False)

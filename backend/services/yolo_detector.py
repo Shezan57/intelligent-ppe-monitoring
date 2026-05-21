@@ -73,7 +73,9 @@ class YOLODetector:
         """
         self.model_path = model_path or settings.yolo_model_path
         self.confidence_threshold = confidence_threshold or settings.yolo_confidence_threshold
-        self.device = device or settings.sam_device  # Use same device as SAM
+        import torch
+        _default = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = device or _default
         
         self.model: Optional[YOLO] = None
         self._is_loaded = False

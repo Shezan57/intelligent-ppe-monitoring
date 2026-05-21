@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api", tags=["upload"])
 
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+MAX_FILE_SIZE = float('inf')  # no limit
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -49,12 +49,6 @@ async def upload_image(
     
     # Read and validate content
     contents = await file.read()
-    
-    if len(contents) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)}MB"
-        )
     
     # Validate it's a valid image
     try:

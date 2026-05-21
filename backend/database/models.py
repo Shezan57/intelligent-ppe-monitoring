@@ -44,6 +44,7 @@ class Violation(Base):
     # Evidence paths
     original_image_path = Column(String(500), nullable=True)
     annotated_image_path = Column(String(500), nullable=True)
+    cropped_roi_path = Column(String(500), nullable=True)  # Person ROI crop for evidence gallery
     
     # System details
     decision_path = Column(String(50), nullable=False)  # 'Fast Safe', 'Fast Violation', etc.

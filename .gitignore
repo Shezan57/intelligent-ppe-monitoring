@@ -6,6 +6,26 @@ __pycache__/
 # C extensions
 *.so
 
+# folders
+docs/
+experiment_results/
+runs/
+.claude/
+brand_new/
+person_tracking/
+diagnostic/
+
+111_Thesis_paper.md
+CLAUDE.md
+cell_output.txt
+ch1_3.md
+ch1_3_fixed.md
+ch4_7.md
+docx_to_md.py
+matches.txt
+test_openai_key.py
+yolo26n.pt
+
 # Distribution / packaging
 .Python
 build/

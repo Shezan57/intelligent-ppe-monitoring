@@ -115,12 +115,55 @@ export const runPipeline = async (file, options = {}) => {
 }
 
 /**
+ * Run Sentry-Judge pipeline on a file already present on the server (bypasses ngrok limit)
+ * @param {string} filePath - Absolute server-side path, e.g. /content/video.mp4
+ * @param {Object} options - Pipeline options
+ * @returns {Promise} Combined Sentry + Judge results
+ */
+export const runPipelineLocalPath = async (filePath, options = {}) => {
+    const response = await api.post('/detect/video/pipeline/local', {
+        file_path: filePath,
+        cooldown_seconds: options.cooldownSeconds ?? 300,
+        camera_zone: options.cameraZone ?? 'CAM-001',
+    }, {
+        timeout: 600000, // 10 min for long videos
+    })
+    return response.data
+}
+
+/**
  * Get verified violations (Judge-confirmed only)
  * @param {Object} params - Query parameters
  * @returns {Promise} Verified violations list
  */
 export const getVerifiedViolations = async (params = {}) => {
     const response = await api.get('/history/verified', { params })
+    return response.data
+}
+
+/**
+ * Generate a PDF violation report for a date range
+ * @param {string} dateFrom - "YYYY-MM-DD"
+ * @param {string} dateTo   - "YYYY-MM-DD"
+ * @param {Object} options  - { sendEmail, email }
+ * @returns {Promise} { pdf_url, filename, stats, email_status }
+ */
+export const generateReport = async (dateFrom, dateTo, options = {}) => {
+    const response = await api.post('/reports/generate', {
+        date_from: dateFrom,
+        date_to: dateTo,
+        send_email: options.sendEmail ?? false,
+        email: options.email || undefined,
+    }, { timeout: 120000 })
+    return response.data
+}
+
+/**
+ * List previously generated reports
+ * @returns {Promise} { reports: [...] }
+ */
+export const listReports = async () => {
+    const response = await api.get('/reports')
     return response.data
 }
 

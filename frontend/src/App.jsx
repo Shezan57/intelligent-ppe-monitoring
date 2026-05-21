@@ -24,6 +24,16 @@ function App() {
     const [activeTab, setActiveTab] = useState('image')
     const [showSettings, setShowSettings] = useState(false)
 
+    // History refresh key — increment to force HistoryTable to reload
+    const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
+
+    const handleVideoResult = useCallback((result) => {
+        if (result) {
+            // Video pipeline completed — trigger history refresh
+            setHistoryRefreshKey(k => k + 1)
+        }
+    }, [])
+
     // Image Detection State
     const [selectedFile, setSelectedFile] = useState(null)
     const [originalImage, setOriginalImage] = useState(null)
@@ -131,9 +141,8 @@ function App() {
                 </div>
 
                 {/* Image Detection Tab */}
-                {activeTab === 'image' && (
+                <div style={{ display: activeTab === 'image' ? 'block' : 'none' }}>
                     <div className="app-layout">
-                        {/* Sidebar */}
                         <aside className="sidebar">
                             <UploadZone
                                 onFileSelect={handleFileSelect}
@@ -179,12 +188,11 @@ function App() {
                                 </h4>
                                 <p>• Hybrid YOLO + SAM detection</p>
                                 <p>• 5-path intelligent bypass</p>
-                                <p>• 79.8% SAM bypass rate</p>
-                                <p>• Real-time performance ~28 FPS</p>
+                                <p>• 5-path triage architecture</p>
+                                <p>• Real-time performance ~51.9 FPS</p>
                             </div>
                         </aside>
 
-                        {/* Main Content */}
                         <div className="main-content">
                             <DetectionCanvas
                                 originalImage={originalImage}
@@ -237,50 +245,22 @@ function App() {
                             )}
                         </div>
                     </div>
-                )}
+                </div>
 
-                {/* Video Detection Tab */}
-                {activeTab === 'video' && (
-                    <div className="app-layout">
-                        <aside className="sidebar">
-                            <VideoUpload />
-                        </aside>
-                        <div className="main-content">
-                            <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-                                <div style={{ fontSize: '4rem', marginBottom: '1rem', opacity: 0.3 }}>🎬</div>
-                                <h3>Video PPE Detection</h3>
-                                <p style={{ maxWidth: '500px', margin: '1rem auto' }}>
-                                    Upload a video file to analyze PPE compliance across all frames.
-                                    The system will process the video and provide aggregate statistics.
-                                </p>
-                                <div className="flex gap-md" style={{ justifyContent: 'center', marginTop: '1.5rem' }}>
-                                    <div className="card" style={{ padding: '1rem', flex: 1, maxWidth: '150px' }}>
-                                        <div style={{ fontSize: '1.5rem' }}>📹</div>
-                                        <small>MP4, AVI, MOV</small>
-                                    </div>
-                                    <div className="card" style={{ padding: '1rem', flex: 1, maxWidth: '150px' }}>
-                                        <div style={{ fontSize: '1.5rem' }}>⚡</div>
-                                        <small>Frame Skip</small>
-                                    </div>
-                                    <div className="card" style={{ padding: '1rem', flex: 1, maxWidth: '150px' }}>
-                                        <div style={{ fontSize: '1.5rem' }}>📊</div>
-                                        <small>Aggregate Stats</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* Video Detection Tab — full width */}
+                <div style={{ display: activeTab === 'video' ? 'block' : 'none' }}>
+                    <VideoUpload onResultChange={handleVideoResult} />
+                </div>
 
                 {/* History Tab */}
-                {activeTab === 'history' && (
-                    <HistoryTable />
-                )}
+                <div style={{ display: activeTab === 'history' ? 'block' : 'none' }}>
+                    <HistoryTable key={historyRefreshKey} />
+                </div>
 
                 {/* Chatbot Tab */}
-                {activeTab === 'chatbot' && (
+                <div style={{ display: activeTab === 'chatbot' ? 'block' : 'none' }}>
                     <ChatBot />
-                )}
+                </div>
             </main>
 
             {/* Settings Modal */}

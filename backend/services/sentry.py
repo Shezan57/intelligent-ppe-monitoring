@@ -72,8 +72,9 @@ class Sentry:
         self.min_confidence = min_person_confidence
         self.camera_zone = camera_zone
 
-        # Cooldown tracker: {person_id: {violation_type: last_timestamp}}
-        self.cooldown_dict: Dict[int, Dict[str, float]] = {}
+        # Cooldown tracker: {person_id: last_timestamp}
+        # Simplified: We only queue a person once per cooldown window since Judge checks the full ROI.
+        self.cooldown_dict: Dict[int, float] = {}
 
         # Statistics
         self.stats = {
@@ -240,19 +241,17 @@ class Sentry:
             if tid == 0:
                 continue
 
-            # === Filter false persons (buildings, objects) ===
-            bw = box[2] - box[0]
-            bh = box[3] - box[1]
-            aspect_ratio = bh / bw if bw > 0 else 0
-            bbox_area = bw * bh
+            # === Filter false persons (buildings, machines) ===
+            # Dynamic aspect ratio + min area (backported from diagnostic pipeline)
+            from utils.bbox_utils import passes_person_filters
+            passes, reject_reason = passes_person_filters(box.tolist())
+            if not passes:
+                self.stats["filtered_false_persons"] += 1
+                continue
 
-            if aspect_ratio < self.min_aspect_ratio:
-                self.stats["filtered_false_persons"] += 1
-                continue
+            # Filter detections occupying >25% of frame (likely false positives)
+            bbox_area = (box[2] - box[0]) * (box[3] - box[1])
             if bbox_area / frame_area > 0.25:
-                self.stats["filtered_false_persons"] += 1
-                continue
-            if bh < 80:
                 self.stats["filtered_false_persons"] += 1
                 continue
             if conf < self.min_confidence:
@@ -378,14 +377,12 @@ class Sentry:
         """
         now = time.time()
 
-        # Check cooldown
+        # Check cooldown (per person)
         if person_id in self.cooldown_dict:
-            person_cooldowns = self.cooldown_dict[person_id]
-            if violation_type in person_cooldowns:
-                last_time = person_cooldowns[violation_type]
-                if (now - last_time) < self.cooldown_seconds:
-                    self.stats["violations_cooldown_skipped"] += 1
-                    return False
+            last_time = self.cooldown_dict[person_id]
+            if (now - last_time) < self.cooldown_seconds:
+                self.stats["violations_cooldown_skipped"] += 1
+                return False
 
         # === Not in cooldown → crop ROI and queue ===
 
@@ -411,9 +408,7 @@ class Sentry:
         self.stats["violations_queued"] += 1
 
         # Update cooldown
-        if person_id not in self.cooldown_dict:
-            self.cooldown_dict[person_id] = {}
-        self.cooldown_dict[person_id][violation_type] = now
+        self.cooldown_dict[person_id] = now
 
         logger.info(
             f"Sentry queued: Person {person_id}, {violation_type}, path={path}"
@@ -429,11 +424,10 @@ class Sentry:
         violation_type: str,
     ) -> str:
         """
-        Crop the relevant ROI and save to disk.
+        Crop the FULL person ROI and save to disk.
 
-        - no_helmet → crop HEAD region (top 40%)
-        - no_vest → crop TORSO region (20-100%)
-        - both_missing → crop full person bbox
+        Always crops the full person bbox — the Judge handles all SAM
+        verification (helmet/vest) on this full crop.
         """
         x1, y1, x2, y2 = [int(v) for v in bbox]
         h, w = frame.shape[:2]
@@ -442,19 +436,8 @@ class Sentry:
         x1, y1 = max(0, x1), max(0, y1)
         x2, y2 = min(w, x2), min(h, y2)
 
-        person_h = y2 - y1
-
-        if violation_type == "no_helmet":
-            # Head ROI: top 40%
-            head_y2 = y1 + int(person_h * 0.4)
-            roi = frame[y1:head_y2, x1:x2].copy()
-        elif violation_type == "no_vest":
-            # Torso ROI: 20% to 100%
-            torso_y1 = y1 + int(person_h * 0.2)
-            roi = frame[torso_y1:y2, x1:x2].copy()
-        else:
-            # both_missing → full person crop
-            roi = frame[y1:y2, x1:x2].copy()
+        # Always crop full person bbox
+        roi = frame[y1:y2, x1:x2].copy()
 
         # Save
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")

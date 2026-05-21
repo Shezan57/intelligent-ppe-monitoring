@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 # Multiple prompts increase recall — SAM 3 picks the best match.
 HELMET_PROMPTS = ["helmet", "hard hat", "safety helmet", "construction helmet"]
 VEST_PROMPTS = ["safety vest", "high visibility vest", "reflective vest", "hi-vis jacket"]
+PERSON_PROMPTS = ["person", "human", "worker", "man", "woman"]
 
 
 class SAMVerifier:
@@ -81,6 +82,8 @@ class SAMVerifier:
             "total_verifications": 0,
             "helmets_found": 0,
             "vests_found": 0,
+            "person_checks": 0,
+            "not_person_rejected": 0,
             "total_time_ms": 0.0,
             "errors": 0,
         }
@@ -231,6 +234,125 @@ class SAMVerifier:
             "processing_time_ms": total_time,
         }
 
+    def verify_is_person(
+        self,
+        roi_crop: np.ndarray,
+    ) -> tuple:
+        """
+        Use SAM 3 to verify if a crop actually contains a person.
+
+        Backported from diagnostic/05_sam_verification.py check_is_person().
+        Uses PERSON_PROMPTS and coverage threshold to confirm.
+
+        Args:
+            roi_crop: Cropped person ROI (BGR, H×W×C)
+
+        Returns:
+            (is_person: bool, person_coverage: float)
+        """
+        self._stats["person_checks"] += 1
+
+        if not self._is_loaded:
+            self.load_model()
+
+        if self._use_mock:
+            # Mock mode: always assume person
+            return True, 0.5
+
+        h, w = roi_crop.shape[:2]
+        if h < 10 or w < 10:
+            self._stats["not_person_rejected"] += 1
+            return False, 0.0
+
+        result = self._run_sam3_verification(roi_crop, PERSON_PROMPTS, "person")
+        coverage = result.get("confidence", 0.0)
+        is_person = coverage >= self.mask_threshold  # Use the general mask threshold
+
+        # Use person-specific threshold from settings
+        from config.settings import settings as s
+        is_person = coverage >= s.person_min_coverage
+
+        if not is_person:
+            self._stats["not_person_rejected"] += 1
+            logger.info(f"SAM3 person check: NOT a person (coverage={coverage:.4f})")
+
+        return is_person, coverage
+
+    def verify_ppe_on_crop(
+        self,
+        roi_crop: np.ndarray,
+        violation_type: str,
+    ) -> Dict[str, Any]:
+        """
+        Verify PPE presence on an already-cropped FULL person ROI.
+
+        Unlike verify_helmet/verify_vest which extract sub-ROIs from a full
+        image, this method works directly on the crop. SAM checks for
+        helmet and/or vest on the same full person image.
+
+        Args:
+            roi_crop: Already-cropped person ROI (BGR, H×W×C)
+            violation_type: 'no_helmet', 'no_vest', or 'both_missing'
+
+        Returns:
+            Dict with helmet_found, vest_found, confidence, processing_time_ms
+        """
+        if not self._is_loaded:
+            self.load_model()
+
+        start_time = time.time()
+
+        # Validate crop size
+        if roi_crop.size == 0 or min(roi_crop.shape[:2]) < 20:
+            return {
+                "helmet_found": False,
+                "vest_found": False,
+                "confidence": 0.0,
+                "processing_time_ms": 0.0,
+                "error": "ROI too small",
+            }
+
+        helmet_found = False
+        vest_found = False
+        helmet_conf = 0.0
+        vest_conf = 0.0
+
+        if violation_type in ("no_helmet", "both_missing"):
+            if self._use_mock:
+                result = self._mock_verification("helmet")
+            else:
+                result = self._run_sam3_verification(roi_crop, HELMET_PROMPTS, "helmet")
+            helmet_found = result.get("helmet_found", False)
+            helmet_conf = result.get("confidence", 0.0)
+            self._stats["total_verifications"] += 1
+            self._stats["total_time_ms"] += (time.time() - start_time) * 1000
+            if helmet_found:
+                self._stats["helmets_found"] += 1
+
+        if violation_type in ("no_vest", "both_missing"):
+            vest_start = time.time()
+            if self._use_mock:
+                result = self._mock_verification("vest")
+            else:
+                result = self._run_sam3_verification(roi_crop, VEST_PROMPTS, "vest")
+            vest_found = result.get("vest_found", False)
+            vest_conf = result.get("confidence", 0.0)
+            self._stats["total_verifications"] += 1
+            self._stats["total_time_ms"] += (time.time() - vest_start) * 1000
+            if vest_found:
+                self._stats["vests_found"] += 1
+
+        total_time = (time.time() - start_time) * 1000
+
+        return {
+            "helmet_found": helmet_found,
+            "vest_found": vest_found,
+            "helmet_confidence": helmet_conf,
+            "vest_confidence": vest_conf,
+            "confidence": max(helmet_conf, vest_conf),
+            "processing_time_ms": total_time,
+        }
+
     def get_stats(self) -> Dict[str, Any]:
         """Get SAM verification statistics for thesis metrics."""
         stats = self._stats.copy()
@@ -284,7 +406,6 @@ class SAMVerifier:
                 "error": "ROI too small",
             }
 
-        # Use mock mode for development without GPU/SAM
         if self._use_mock:
             result = self._mock_verification(item_type)
         else:
@@ -379,7 +500,7 @@ class SAMVerifier:
 
     def _mock_verification(self, item_type: str) -> Dict[str, Any]:
         """
-        Mock verification for development without SAM 3.
+        Mock verification for development without SAM.
 
         Returns random-ish results for testing the pipeline.
         """

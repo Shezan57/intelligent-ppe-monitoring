@@ -23,6 +23,10 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
+from dotenv import load_dotenv
+
+# Load variables from .env file
+load_dotenv()
 
 # Database schema description for the LLM
 DB_SCHEMA = """
@@ -80,7 +84,17 @@ RULES:
 7. When the user asks about "this month", use date('now', 'start of month').
 8. Return results in a friendly, conversational tone suitable for a site manager.
 9. If the question cannot be answered from the database, say so politely.
-10. Use the violations table primarily. Use verified_violations only when asked about SAM/Judge verified data.
+10. IMPORTANT — Table usage:
+    - The system has TWO violation tables:
+      * "violations" — written by the image/basic-video detection endpoint
+      * "verified_violations" — written by the Sentry-Judge pipeline (the main demo workflow)
+    - When counting or listing violations, ALWAYS query BOTH tables and SUM the results.
+      Example for total today:
+        SELECT (SELECT COUNT(*) FROM violations WHERE date(timestamp)=date('now'))
+             + (SELECT COUNT(*) FROM verified_violations WHERE date(timestamp)=date('now'))
+             AS total_violations
+    - Use verified_violations for questions about SAM confidence, judge confirmation, person_id, camera_zone.
+    - Use violations for questions about site_location, camera_id, sam_activated, detection_confidence.
 
 Respond with JSON in this exact format:
 {{
@@ -106,11 +120,21 @@ class ChatbotService:
 
     def __init__(self):
         self.client = None
-        self.model = "gpt-4o-mini"  # Cost-effective for text-to-SQL
+        self.model = "gpt-4o-mini"
 
-        api_key = os.getenv("OPENAI_API_KEY", "")
+        from dotenv import dotenv_values
+        _env = dotenv_values()
+        api_key = _env.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY", "")
         if api_key and OPENAI_AVAILABLE:
-            self.client = OpenAI(api_key=api_key)
+            if api_key.startswith("sk-or-"):
+                # OpenRouter key — requires different base URL and model prefix
+                self.client = OpenAI(
+                    api_key=api_key,
+                    base_url="https://openrouter.ai/api/v1",
+                )
+                self.model = "openai/gpt-4o-mini"
+            else:
+                self.client = OpenAI(api_key=api_key)
 
     def is_available(self) -> bool:
         """Check if the chatbot service is properly configured."""

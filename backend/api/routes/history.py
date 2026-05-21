@@ -91,6 +91,7 @@ async def get_violation_history(
             processing_time_ms=v.processing_time_ms,
             original_image_path=v.original_image_path,
             annotated_image_path=v.annotated_image_path,
+            cropped_roi_path=getattr(v, 'cropped_roi_path', None),
             report_sent=v.report_sent,
             # Session fields
             session_start=v.session_start,
@@ -117,56 +118,104 @@ async def get_history_summary(
 ):
     """
     Get summary statistics for recent violations.
-    
+
+    Aggregates from BOTH tables:
+    - violations      → image/basic-video detection results
+    - verified_violations → Sentry-Judge pipeline results
+
     Returns:
         Summary with counts, compliance rates, trends
     """
     from sqlalchemy import func
-    
+    from database.models import VerifiedViolation, DailyReport
+
     start_date = datetime.now() - timedelta(days=days)
-    
-    # Total violations
-    total_violations = db.query(Violation).filter(
-        Violation.timestamp >= start_date
-    ).count()
-    
-    # By type
-    by_type = db.query(
+
+    # ── violations table (image / basic-video detection) ──────────────
+    v_total = db.query(Violation).filter(Violation.timestamp >= start_date).count()
+
+    v_by_type = db.query(
         Violation.violation_type,
         func.count(Violation.id).label("count")
-    ).filter(
-        Violation.timestamp >= start_date
-    ).group_by(Violation.violation_type).all()
-    
-    type_counts = {t: c for t, c in by_type}
-    
-    # By camera
-    by_camera = db.query(
+    ).filter(Violation.timestamp >= start_date).group_by(Violation.violation_type).all()
+    v_type = {t: c for t, c in v_by_type}
+
+    v_sam = db.query(func.count(Violation.id)).filter(
+        Violation.timestamp >= start_date,
+        Violation.sam_activated == True
+    ).scalar() or 0
+
+    v_camera = db.query(
         Violation.camera_id,
         func.count(Violation.id).label("count")
-    ).filter(
-        Violation.timestamp >= start_date
-    ).group_by(Violation.camera_id).all()
-    
-    camera_counts = {cam: cnt for cam, cnt in by_camera}
-    
-    # Daily trend
-    daily = db.query(
+    ).filter(Violation.timestamp >= start_date).group_by(Violation.camera_id).all()
+    camera_counts = {cam: cnt for cam, cnt in v_camera}
+
+    # ── verified_violations table (Sentry-Judge pipeline) ─────────────
+    vv_total = db.query(VerifiedViolation).filter(
+        VerifiedViolation.timestamp >= start_date
+    ).count()
+
+    vv_by_type = db.query(
+        VerifiedViolation.violation_type,
+        func.count(VerifiedViolation.id).label("count")
+    ).filter(VerifiedViolation.timestamp >= start_date).group_by(VerifiedViolation.violation_type).all()
+    vv_type = {t: c for t, c in vv_by_type}
+
+    # ── Combine both tables ────────────────────────────────────────────
+    total_violations = v_total + vv_total
+    no_helmet_count  = v_type.get("no_helmet", 0)  + vv_type.get("no_helmet", 0)
+    no_vest_count    = v_type.get("no_vest", 0)    + vv_type.get("no_vest", 0)
+    both_missing_count = v_type.get("both_missing", 0) + vv_type.get("both_missing", 0)
+    # Every row in verified_violations passed SAM; v_sam tracks SAM in basic detection
+    sam_activations  = v_sam + vv_total
+
+    # ── Compliance rate ────────────────────────────────────────────────
+    # Prefer the most recent daily report value; fall back to null
+    compliance_rate = None
+    try:
+        latest = db.query(DailyReport).order_by(DailyReport.report_date.desc()).first()
+        if latest:
+            compliance_rate = round(float(latest.compliance_rate), 1)
+    except Exception:
+        pass
+
+    # ── Daily trend (combined) ─────────────────────────────────────────
+    v_daily = db.query(
         func.date(Violation.timestamp).label("date"),
         func.count(Violation.id).label("count")
-    ).filter(
-        Violation.timestamp >= start_date
-    ).group_by(func.date(Violation.timestamp)).all()
-    
-    daily_trend = [{"date": str(d), "count": c} for d, c in daily]
-    
+    ).filter(Violation.timestamp >= start_date).group_by(func.date(Violation.timestamp)).all()
+
+    vv_daily = db.query(
+        func.date(VerifiedViolation.timestamp).label("date"),
+        func.count(VerifiedViolation.id).label("count")
+    ).filter(VerifiedViolation.timestamp >= start_date).group_by(func.date(VerifiedViolation.timestamp)).all()
+
+    trend_map: dict = {}
+    for d, c in v_daily:
+        trend_map[str(d)] = trend_map.get(str(d), 0) + c
+    for d, c in vv_daily:
+        trend_map[str(d)] = trend_map.get(str(d), 0) + c
+    daily_trend = [{"date": k, "count": v} for k, v in sorted(trend_map.items())]
+
     return {
         "success": True,
         "period_days": days,
+        # Flat fields the frontend StatCards read directly
         "total_violations": total_violations,
-        "by_type": type_counts,
+        "no_helmet_count": no_helmet_count,
+        "no_vest_count": no_vest_count,
+        "both_missing_count": both_missing_count,
+        "sam_activations": sam_activations,
+        "compliance_rate": compliance_rate,
+        # Legacy nested structure kept for backward compat
+        "by_type": {
+            "no_helmet": no_helmet_count,
+            "no_vest": no_vest_count,
+            "both_missing": both_missing_count,
+        },
         "by_camera": camera_counts,
-        "daily_trend": daily_trend
+        "daily_trend": daily_trend,
     }
 
 
@@ -245,5 +294,6 @@ async def get_violation_detail(
         processing_time_ms=violation.processing_time_ms,
         original_image_path=violation.original_image_path,
         annotated_image_path=violation.annotated_image_path,
+        cropped_roi_path=getattr(violation, 'cropped_roi_path', None),
         report_sent=violation.report_sent
     )

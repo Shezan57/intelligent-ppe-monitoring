@@ -143,6 +143,7 @@ class ViolationResponse(BaseModel):
     processing_time_ms: Optional[float]
     original_image_path: Optional[str]
     annotated_image_path: Optional[str]
+    cropped_roi_path: Optional[str] = None
     report_sent: bool
     # Session tracking fields
     session_start: Optional[datetime] = None

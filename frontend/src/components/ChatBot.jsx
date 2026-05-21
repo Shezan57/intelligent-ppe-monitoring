@@ -6,9 +6,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import axios from 'axios'
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import api from '../api/client'
 
 // Suggested questions for quick access
 const SUGGESTED_QUESTIONS = [
@@ -35,7 +33,7 @@ function ChatBot() {
 
     // Check chatbot availability on mount
     useEffect(() => {
-        axios.get(`${API_BASE}/api/chatbot/status`)
+        api.get('/chatbot/status')
             .then(res => setIsAvailable(res.data.available))
             .catch(() => setIsAvailable(false))
     }, [])
@@ -57,7 +55,7 @@ function ChatBot() {
         setIsLoading(true)
 
         try {
-            const res = await axios.post(`${API_BASE}/api/chatbot/ask`, { question })
+            const res = await api.post('/chatbot/ask', { question })
             const data = res.data
 
             let content = data.answer || 'No response received.'

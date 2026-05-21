@@ -70,7 +70,9 @@ class AgenticReporter:
         """
         self.output_dir = output_dir or getattr(settings, 'report_output_dir', 'reports')
         self.llm_provider = llm_provider
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+        from dotenv import dotenv_values
+        _env = dotenv_values()
+        self.api_key = api_key or _env.get("OPENAI_API_KEY") or os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENAI_API_KEY")
         os.makedirs(self.output_dir, exist_ok=True)
 
     def generate_report(
@@ -250,12 +252,20 @@ class AgenticReporter:
             return None
 
     def _call_openai(self, prompt: str) -> Optional[str]:
-        """Call OpenAI API."""
+        """Call OpenAI or OpenRouter API."""
         try:
             from openai import OpenAI
-            client = OpenAI(api_key=self.api_key)
+            if self.api_key and self.api_key.startswith("sk-or-"):
+                client = OpenAI(
+                    api_key=self.api_key,
+                    base_url="https://openrouter.ai/api/v1",
+                )
+                model = "openai/gpt-4o-mini"
+            else:
+                client = OpenAI(api_key=self.api_key)
+                model = "gpt-4o-mini"
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=800,
             )

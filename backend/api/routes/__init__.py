@@ -4,6 +4,7 @@ from .upload import router as upload_router
 from .history import router as history_router
 from .video import router as video_router
 from .chatbot import router as chatbot_router
+from .reports import router as reports_router
 
-__all__ = ["detection_router", "upload_router", "history_router", "video_router", "chatbot_router"]
+__all__ = ["detection_router", "upload_router", "history_router", "video_router", "chatbot_router", "reports_router"]
 

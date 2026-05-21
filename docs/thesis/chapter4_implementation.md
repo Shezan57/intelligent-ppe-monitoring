@@ -32,6 +32,8 @@ Table 4.1 summarizes the composition of each source dataset.
 
 Each source dataset employed differing class naming conventions (e.g., `hardhat` vs. `helmet`, `safety-vest` vs. `vest`, `no-hardhat` vs. `bare-head`). A standardization script mapped all source annotations to the following five-class unified schema:
 
+**Table 4.2: Unified Five-Class Schema**
+
 | Class ID | Class Name | Description |
 |----------|-----------|-------------|
 | 0 | `helmet` | Hard hat present on worker's head |
@@ -50,8 +52,15 @@ Following merging, the combined dataset underwent quality filtering:
 
 The final dataset of 29,053 images was divided into training (80%), validation (10%), and test (10%) splits with stratified sampling to maintain class distribution across splits.
 
-*[Insert Figure 4.1: D5_dataset_pipeline.png — Dataset Engineering Pipeline]*
-*[Insert Figure 4.2: D6b_class_distribution.jpg — Class Label Distribution]*
+Figure 4.1 illustrates the end-to-end dataset engineering pipeline from source ingestion to final split generation. Figure 4.2 shows the resulting class label distribution across the unified dataset.
+
+**Figure 4.1:** *Dataset Engineering Pipeline showing the six-stage process: source collection, format conversion, schema standardization, deduplication, quality filtering, and stratified train/val/test splitting.*
+
+![Figure 4.1: Dataset Engineering Pipeline](../thesis_figures/D5_dataset_pipeline.png)
+
+**Figure 4.2:** *Class Label Distribution across the unified 29,053-image dataset, showing the relative frequency of helmet, vest, person, no-helmet, and no-vest annotations.*
+
+![Figure 4.2: Class Label Distribution](../thesis_figures/D6b_class_distribution.jpg)
 
 ### 4.2.4 Augmentation Experiments
 
@@ -62,9 +71,9 @@ To assess the impact of data augmentation, an additional 2,550 person-specific i
 
 ### 4.3.1 Training Configuration
 
-The YOLO26m model [7] was trained using the Ultralytics training pipeline. Training was performed on a GPU instance. Table 4.2 summarizes the key training hyperparameters.
+The YOLO26m model [7] was trained using the Ultralytics training pipeline. Training was performed on a GPU instance. Table 4.3 summarizes the key training hyperparameters.
 
-**Table 4.2: YOLO26m Training Configuration**
+**Table 4.3: YOLO26m Training Configuration**
 
 | Parameter | Value |
 |-----------|-------|
@@ -81,8 +90,15 @@ The YOLO26m model [7] was trained using the Ultralytics training pipeline. Train
 
 ### 4.3.2 Training Progress
 
-*[Insert Figure 4.3: D6_training_results.png — Training Metric Curves (All Metrics)]*
-*[Insert Figure 4.4: D6c_training_convergence.png — Loss and mAP Convergence]*
+Figures 4.3 and 4.4 present the training progression over 50 epochs, showing all recorded metrics and the loss/mAP convergence behavior respectively.
+
+**Figure 4.3:** *Training Metric Curves (All Metrics) recorded over 50 epochs, including box loss, classification loss, DFL loss, precision, recall, mAP@50, and mAP@50-95.*
+
+![Figure 4.3: Training Metric Curves](../thesis_figures/D6_training_results.png)
+
+**Figure 4.4:** *Loss and mAP Convergence over 50 epochs. The classification loss decreases from 2.22 (epoch 1) to 0.36 (epoch 50), while mAP@50 improves from 0.637 to 0.893, demonstrating stable convergence without overfitting.*
+
+![Figure 4.4: Loss and mAP Convergence](../thesis_figures/D6c_training_convergence.png)
 
 Training curves show consistent improvement across all metrics over 50 epochs. The classification loss, which started at 2.22 in epoch 1, decreased to 0.36 by epoch 50, indicating strong model convergence. The mAP@50 metric improved from 0.637 (epoch 1) to 0.893 (epoch 50), demonstrating stable learning without overfitting.
 
@@ -119,6 +135,8 @@ The backend is implemented in Python using the FastAPI framework [27]. The servi
 
 The backend consists of the following service modules:
 
+**Table 4.4: Backend Service Module Structure**
+
 | Module | File | Responsibility |
 |--------|------|---------------|
 | YOLO Detector | `yolo_detector.py` | Model loading and frame inference |
@@ -133,15 +151,23 @@ The backend consists of the following service modules:
 | Email Service | `email_service.py` | SMTP report distribution |
 | Storage Service | `storage_service.py` | ROI image persistence |
 
-### 4.4.2 Five-Path Triage Implementation
+### 4.4.2 Class Architecture
 
-The triage logic is implemented in `hybrid_detector.py` as the `HybridDetector` class. The `_process_person()` method evaluates each detected person bounding box against the five decision paths. For each person, the detector queries the YOLO output for overlapping PPE-class bounding boxes using IoU filtering. The decision path is determined by the presence or absence of the `helmet`, `vest`, `no-helmet`, and `no-vest` classes within the person's bounding box region.
+Figure 4.5 presents the UML class diagram for the backend service layer, showing the key classes, their attributes, methods, and inter-class relationships. The `HybridDetector` class serves as the central orchestrator, coordinating between the `YOLODetector`, `SAMVerifier`, and `ViolationTracker` classes to implement the five-path triage logic described in Section 3.5.3.
 
-### 4.4.3 Database Integration
+**Figure 4.5:** *UML Class Diagram showing the backend service architecture. Key classes include HybridDetector (triage orchestrator), YOLODetector (YOLO inference), SAMVerifier (SAM verification), ViolationTracker (cooldown logic), ReportGenerator (PDF generation), and ChatbotService (text-to-SQL).*
+
+![Figure 4.5: UML Class Diagram](../thesis_figures/D21_class_diagram.png)
+
+### 4.4.3 Five-Path Triage Implementation
+
+The triage logic is implemented in `hybrid_detector.py` as the `HybridDetector` class. The `_process_person()` method evaluates each detected person bounding box against the five decision paths. For each person, the detector queries the YOLO output for overlapping PPE-class bounding boxes using IoU filtering. The decision path is determined by the presence or absence of the `helmet`, `vest`, `no-helmet`, and `no-vest` classes within the person's bounding box region. The algorithm-level specification is provided in **Algorithm 1** (see Algorithms appendix).
+
+### 4.4.4 Database Integration
 
 The system uses SQLAlchemy 2.0 as the ORM layer, with SQLite as the default persistence backend. Database sessions are managed through FastAPI's dependency injection system, ensuring proper session lifecycle management per request. All database models are defined in `database/models.py`, and the schema is created at application startup via `Base.metadata.create_all()`.
 
-### 4.4.4 Configuration Management
+### 4.4.5 Configuration Management
 
 All runtime parameters are managed through Pydantic Settings, loaded from a `.env` file at startup. This approach provides type-safe configuration with automatic validation of environment variables. Key configurable parameters include the YOLO model path, SAM model path, violation cooldown duration, IoU tracking threshold, SMTP credentials, and the OpenAI API key.
 
@@ -154,6 +180,8 @@ The frontend is implemented as a React 18 [28] single-page application built wit
 
 The application consists of eight primary components:
 
+**Table 4.5: Frontend Component Structure**
+
 | Component | Responsibility |
 |-----------|---------------|
 | `Header` | Navigation bar and settings trigger |
@@ -165,16 +193,44 @@ The application consists of eight primary components:
 | `VideoUpload` | Video file processing interface |
 | `ChatBot` | Conversational violation query interface |
 
-### 4.5.2 Chatbot Interface
+### 4.5.2 Application Interface
 
-The `ChatBot` component provides a full-screen chat interface with suggested quick-questions (e.g., "How many violations today?"), a typing indicator, and an expandable SQL query viewer that shows the generated SQL for each response. This transparency feature allows technically proficient users to verify the accuracy of the query before acting on the result.
+Figures 4.6 through 4.11 present screenshots of the implemented frontend application, demonstrating the system's end-to-end user experience across all primary views.
+
+**Figure 4.6:** *Dashboard Upload Interface — the landing page providing drag-and-drop image upload functionality with a clean, modern UI design.*
+
+![Figure 4.6: Dashboard Upload Interface](../thesis_figures/S1_dashboard_upload.png)
+
+**Figure 4.7:** *Detection Result View — showing annotated bounding boxes overlaid on the uploaded image with per-detection class labels, confidence scores, and a summary statistics panel.*
+
+![Figure 4.7: Detection Result View](../thesis_figures/S2_detection_result.png)
+
+**Figure 4.8:** *Video Processing Interface — showing the video upload, frame-by-frame analysis controls, and real-time detection statistics accumulated across processed frames.*
+
+![Figure 4.8: Video Processing Interface](../thesis_figures/S3_video_processing.png)
+
+**Figure 4.9:** *Violation History View — displaying a paginated table of all recorded violations with filtering by date, violation type, and decision path, along with saved ROI evidence images.*
+
+![Figure 4.9: Violation History View](../thesis_figures/S4_violation_history.png)
+
+**Figure 4.10:** *Settings Panel — allowing site administrators to configure runtime parameters including confidence thresholds, cooldown durations, model selection, and email notification preferences.*
+
+![Figure 4.10: Settings Panel](../thesis_figures/S6_settings_panel.png)
+
+### 4.5.3 Chatbot Interface
+
+The `ChatBot` component provides a full-screen chat interface with suggested quick-questions (e.g., "How many violations today?"), a typing indicator, and an expandable SQL query viewer that shows the generated SQL for each response. This transparency feature allows technically proficient users to verify the accuracy of the query before acting on the result. Figure 4.11 illustrates the chatbot interface.
+
+**Figure 4.11:** *AI Chatbot Interface — showing the conversational violation query interface with suggested quick-questions, the generated SQL query viewer, and natural language responses.*
+
+![Figure 4.11: Chatbot Interface](../thesis_figures/S5_chatbot_interface.png)
 
 
 ## 4.6 Chatbot Service Implementation
 
-The chatbot service (`chatbot_service.py`) implements the text-to-SQL pipeline described in Section 3.7. The OpenAI API is invoked with `response_format={"type": "json_object"}`, enforcing structured JSON output that contains the generated SQL, an explanation, and an answer template. The service is initialized lazily on first use, and the OpenAI client is only instantiated when a valid `OPENAI_API_KEY` is present in the environment — allowing the rest of the system to function without the chatbot when the key is not configured.
+The chatbot service (`chatbot_service.py`) implements the text-to-SQL pipeline described in Section 3.9. The OpenAI API is invoked with `response_format={"type": "json_object"}`, enforcing structured JSON output that contains the generated SQL, an explanation, and an answer template. The service is initialized lazily on first use, and the OpenAI client is only instantiated when a valid `OPENAI_API_KEY` is present in the environment — allowing the rest of the system to function without the chatbot when the key is not configured.
 
 
 ## 4.7 Chapter Summary
 
-This chapter described the complete implementation of the Intelligent PPE Compliance Monitoring System. The dataset was assembled from seven source datasets totaling 29,053 images after sanitization, standardized to a five-class schema, and used to train a YOLO26m model for 50 epochs. The training objective (Eq. 4.1) combines DFL bounding box regression (Eq. 4.2) and multi-class Binary Cross-Entropy (Eq. 4.3), optimized using AdamW with cosine annealing. The backend provides a modular Python service architecture built on FastAPI, with SQLAlchemy for persistence and Pydantic for configuration management. The frontend provides a React-based dashboard with image, video, history, and chatbot interfaces.
+This chapter described the complete implementation of the Intelligent PPE Compliance Monitoring System. The dataset was assembled from seven source datasets totaling 29,053 images after sanitization (Figure 4.1), standardized to a five-class schema (Table 4.2), and used to train a YOLO26m model for 50 epochs (Figures 4.3–4.4). The training objective (Eq. 4.1) combines DFL bounding box regression (Eq. 4.2) and multi-class Binary Cross-Entropy (Eq. 4.3), optimized using AdamW with cosine annealing. The backend provides a modular Python service architecture built on FastAPI (Table 4.4), with its class relationships formalized in the UML class diagram (Figure 4.5). The frontend provides a React-based dashboard with image detection (Figure 4.7), video processing (Figure 4.8), violation history (Figure 4.9), settings (Figure 4.10), and chatbot interfaces (Figure 4.11).
