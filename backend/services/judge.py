@@ -234,11 +234,11 @@ class Judge:
         # ── Sub-ROI extraction (Geometric Prompt Engineering) ────────────────
         # Head ROI: top 40% of the person crop
         head_cut = max(1, int(h * 0.40))
-        head_crop = roi_image[0:head_cut, 0:w]
+        head_crop = roi_image[0:head_cut, 0:w].copy()
 
         # Torso ROI: 20%–100% of the person crop
         torso_start = max(0, int(h * 0.20))
-        torso_crop = roi_image[torso_start:h, 0:w]
+        torso_crop = roi_image[torso_start:h, 0:w].copy()
 
         if violation_type == "no_helmet":
             result = self.sam.verify_ppe_on_crop(head_crop, "no_helmet")

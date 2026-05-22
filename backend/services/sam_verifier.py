@@ -456,32 +456,39 @@ class SAMVerifier:
                 roi_crop = cv2.resize(roi_crop, None, fx=scale, fy=scale,
                                      interpolation=cv2.INTER_LINEAR)
 
+            # SAM3 expects RGB — OpenCV gives BGR. Convert.
+            roi_rgb = cv2.cvtColor(roi_crop, cv2.COLOR_BGR2RGB)
+
             # Step 1: Set image (encodes features)
-            self.predictor.set_image(roi_crop)
+            self.predictor.set_image(roi_rgb)
 
             # Step 2: Query with text prompts
             results = self.predictor(text=prompts)
 
             # Step 3: Analyze masks
             if not results or results[0].masks is None or len(results[0].masks.data) == 0:
+                print(f"  SAM3 {item_type}: NO MASKS returned (crop {w}x{h})")
                 return {
                     f"{item_type}_found": False,
                     "confidence": 0.0,
                 }
 
-            # Calculate maximum mask coverage across all returned masks
+            # Calculate maximum mask coverage across all returned masks.
+            # Masks may be bool OR float32 — binarise at 0.5 to handle both.
             max_coverage = 0.0
             for mask in results[0].masks.data:
                 mask_np = mask.cpu().numpy()
-                coverage = float(np.sum(mask_np)) / float(mask_np.size)
+                mask_bin = (mask_np > 0.5).astype(np.float32)
+                coverage = float(np.sum(mask_bin)) / float(mask_bin.size)
                 max_coverage = max(max_coverage, coverage)
 
             # Check against threshold
             found = max_coverage > self.mask_threshold
 
-            logger.debug(
-                f"SAM3 {item_type}: coverage={max_coverage:.3f}, "
-                f"threshold={self.mask_threshold}, found={found}"
+            print(
+                f"  SAM3 {item_type}: coverage={max_coverage:.4f} "
+                f"(thresh={self.mask_threshold}) → {'FOUND ✅' if found else 'MISS ❌'} "
+                f"crop={w}x{h}"
             )
 
             return {
