@@ -142,7 +142,7 @@ app = FastAPI(
     5. **Critical:** SAM verifies both ROIs
     
     ---
-    Built for Master's Thesis - Intelligent PPE Compliance Monitoring
+    Built for Undergraduate Thesis - Intelligent PPE Compliance Monitoring
     """,
     version="1.0.0",
     lifespan=lifespan

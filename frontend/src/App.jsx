@@ -2,7 +2,7 @@
  * PPE Detection Frontend - Main Application
  * 
  * Intelligent PPE Compliance Monitoring System
- * Master's Thesis Project
+ * Undergraduate Thesis Project
  */
 
 import { useState, useCallback } from 'react'
@@ -277,7 +277,7 @@ function App() {
                 borderTop: '1px solid var(--border-color)',
                 marginTop: 'auto'
             }}>
-                Master's Thesis Project • Intelligent PPE Compliance Monitoring •
+                Undergraduate Thesis Project • Intelligent PPE Compliance Monitoring •
                 Hybrid YOLO + SAM Detection with 5-Path Intelligent Bypass
             </footer>
         </>

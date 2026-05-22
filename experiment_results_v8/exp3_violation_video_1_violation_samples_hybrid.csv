@@ -1,0 +1,16 @@
+filename,frame,track_id,violation_type,path,yolo_conf,manual_label,manual_reason
+frame00000_id1_both_missing.jpg,0,1,both_missing,Critical,0.607004881,TP,
+frame00000_id2_both_missing.jpg,0,2,both_missing,Critical,0.500137568,TP,
+frame00000_id3_both_missing.jpg,0,3,both_missing,Critical,0.371184826,TP,
+frame00000_id5_both_missing.jpg,0,5,both_missing,Critical,0.302064866,TP,
+frame00002_id5_no_helmet.jpg,2,5,no_helmet,Critical,0.325194716,FP,both are missing but he has a cap like muslim people wear and same peson frame00000_id5_both_missing.jpg
+frame00002_id6_both_missing.jpg,2,6,both_missing,Critical,0.34956345,TP,
+frame00004_id3_no_helmet.jpg,4,3,no_helmet,Critical,0.461254984,FP,missing everything
+frame00010_id7_both_missing.jpg,10,7,both_missing,Critical,0.326146394,FP,"this is a machine, false person detection"
+frame00114_id24_both_missing.jpg,114,24,both_missing,Critical,0.455185354,TP,
+frame00126_id31_both_missing.jpg,126,31,both_missing,Critical,0.362925112,TP,
+frame00128_id32_both_missing.jpg,128,32,both_missing,Critical,0.38875556,TP,
+frame00130_id31_no_vest.jpg,130,31,no_vest,Rescue Body,0.438578665,FP,both are missing but he has a cap made of scarp on his head 
+frame00150_id2_both_missing.jpg,150,2,both_missing,Critical,0.57193917,TP,
+frame00168_id38_no_helmet.jpg,168,38,no_helmet,Critical,0.356356859,FP,both are missing 
+frame00180_id38_both_missing.jpg,180,38,both_missing,Critical,0.386961967,TP,immidiate same person

@@ -124,9 +124,20 @@ async def generate_report(body: ReportRequest, db: Session = Depends(get_db)):
             self.decision_path     = vv.decision_path or "Pipeline"
             self.detection_confidence = vv.sentry_confidence
             self.sam_activated     = True
-            self.annotated_image_path = None
+            # Resolve URL path → filesystem path for PDF image embedding
+            if vv.image_path:
+                _backend_dir = os.path.normpath(
+                    os.path.join(os.path.dirname(__file__), "..", "..")
+                )
+                _fs_path = os.path.normpath(
+                    os.path.join(_backend_dir, vv.image_path.lstrip("/\\").replace("/", os.sep))
+                )
+                self.annotated_image_path = _fs_path if os.path.exists(_fs_path) else None
+            else:
+                self.annotated_image_path = None
             self.cropped_roi_path  = vv.image_path
             self.original_image_path = vv.image_path
+            self.processing_time_ms = vv.judge_processing_time_ms
             self.occurrence_count  = 1
             self.total_duration_minutes = 0.0
 

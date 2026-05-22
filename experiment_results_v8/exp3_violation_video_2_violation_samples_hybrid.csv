@@ -1,0 +1,22 @@
+filename,frame,track_id,violation_type,path,yolo_conf,manual_label,manual_reason
+frame00000_id1_no_vest.jpg,0,1,no_vest,Critical,0.835724473,TP,
+frame00000_id2_no_vest.jpg,0,2,no_vest,Critical,0.686632812,TP,
+frame00000_id4_no_vest.jpg,0,4,no_vest,Critical,0.423940182,TP,
+frame00002_id2_both_missing.jpg,2,2,both_missing,Critical,0.745054185,FP,"has helmet, vest missing"
+frame00022_id1_both_missing.jpg,22,1,both_missing,Critical,0.525485337,FP,"blurry image but has helmet, vest missing"
+frame00044_id1_no_helmet.jpg,44,1,no_helmet,Critical,0.3246364,FP,immidiate same picture
+frame00050_id4_both_missing.jpg,50,4,both_missing,Critical,0.563374221,FP,"has helmet, vest missing"
+frame00126_id4_no_helmet.jpg,126,4,no_helmet,Critical,0.325353682,FP,"has helmet, vest missing, immidiate same person"
+frame00132_id10_no_helmet.jpg,132,10,no_helmet,Critical,0.436732531,TP,"just has body head is cropped maybe its videos problem, vest is also missing"
+frame00154_id25_no_helmet.jpg,154,25,no_helmet,Critical,0.533979893,TP,
+frame00154_id4_no_vest.jpg,154,4,no_vest,Critical,0.324552774,TP,
+frame00164_id25_both_missing.jpg,164,25,both_missing,Critical,0.642743468,FP,"has helmet, vest missing"
+frame00184_id30_both_missing.jpg,184,30,both_missing,Critical,0.622568607,TP,
+frame00190_id25_no_vest.jpg,190,25,no_vest,Critical,0.451708883,TP,
+frame00192_id30_no_vest.jpg,192,30,no_vest,Critical,0.547443271,TP,
+frame00196_id32_no_vest.jpg,196,32,no_vest,Critical,0.453856498,TP,
+frame00270_id43_no_vest.jpg,270,43,no_vest,Critical,0.30735445,TP,
+frame00288_id43_both_missing.jpg,288,43,both_missing,Critical,0.532141566,FP,"has helmet, vest is missing"
+frame00304_id25_no_helmet.jpg,304,25,no_helmet,Critical,0.710445523,FP,"blurry image but has helmet, vest missing"
+frame00384_id48_no_helmet.jpg,384,48,no_helmet,Critical,0.406641603,TP,
+frame00388_id52_no_vest.jpg,388,52,no_vest,Rescue Body,0.377705425,TP,

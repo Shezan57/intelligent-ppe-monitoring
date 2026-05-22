@@ -1,0 +1,19 @@
+filename,frame,track_id,violation_type,path,yolo_conf,manual_label,manual_reason
+frame00000_id1_both_missing.jpg,0,1,both_missing,Critical (no SAM),0.835724473,FP,"Has helmet, Vest is missing"
+frame00000_id2_both_missing.jpg,0,2,both_missing,Critical (no SAM),0.686632812,FP,"Has helmet, Vest is missing"
+frame00000_id4_both_missing.jpg,0,4,both_missing,Critical (no SAM),0.423940182,FP,"Has helmet, Vest is missing"
+frame00018_id10_both_missing.jpg,18,10,both_missing,Critical (no SAM),0.324020177,FP,"Has helmet, Vest is missing"
+frame00042_id10_no_vest.jpg,42,10,no_vest,Rescue Body (no SAM),0.377857625,TP,
+frame00150_id2_both_missing.jpg,150,2,both_missing,Critical (no SAM),0.34873122,FP,"Has helmet, Vest is missing"
+frame00154_id25_both_missing.jpg,154,25,both_missing,Critical (no SAM),0.533979893,TP,
+frame00154_id4_both_missing.jpg,154,4,both_missing,Critical (no SAM),0.324552774,FP,"Has helmet, Vest is missing, too small abd blurry"
+frame00184_id30_both_missing.jpg,184,30,both_missing,Critical (no SAM),0.622568607,TP,
+frame00188_id10_both_missing.jpg,188,10,both_missing,Critical (no SAM),0.378178954,FP,"Has helmet, vest is missing"
+frame00192_id32_no_vest.jpg,192,32,no_vest,Rescue Body (no SAM),0.42474404,TP,
+frame00194_id32_both_missing.jpg,194,32,both_missing,Critical (no SAM),0.395987988,FP,
+frame00202_id10_no_vest.jpg,202,10,no_vest,Rescue Body (no SAM),0.331108749,TP,
+frame00270_id43_both_missing.jpg,270,43,both_missing,Critical (no SAM),0.30735445,FP,Has helmet vest is missing
+frame00302_id48_both_missing.jpg,302,48,both_missing,Critical (no SAM),0.400175095,TP,
+frame00304_id25_both_missing.jpg,304,25,both_missing,Critical (no SAM),0.710445523,FP,that blurry and small picture
+frame00368_id52_no_vest.jpg,368,52,no_vest,Rescue Body (no SAM),0.332056522,TP,
+frame00378_id52_both_missing.jpg,378,52,both_missing,Critical (no SAM),0.317163885,FP,Has helmet vest is missing

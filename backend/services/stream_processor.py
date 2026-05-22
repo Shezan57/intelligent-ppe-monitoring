@@ -114,36 +114,14 @@ class StreamProcessor:
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         
         # Setup output video writer
+        # Always write mp4v to an .mp4 container; ffmpeg re-encodes to H.264
+        # afterwards so the file plays in every browser.
         out = None
         if output_path:
-            # Use XVID codec which is more browser-compatible
-            # Try multiple codecs for cross-platform support
-            codecs_to_try = [
-                ('XVID', '.avi'),   # Most compatible
-                ('MJPG', '.avi'),   # Motion JPEG fallback
-                ('mp4v', '.mp4'),   # Last resort
-            ]
-            
-            out_fps = fps / self.frame_skip  # Reduced FPS for output
-            
-            for codec, ext in codecs_to_try:
-                try:
-                    fourcc = cv2.VideoWriter_fourcc(*codec)
-                    # Update output path extension
-                    test_path = os.path.splitext(output_path)[0] + ext
-                    out = cv2.VideoWriter(test_path, fourcc, out_fps, (width, height))
-                    if out.isOpened():
-                        output_path = test_path  # Update to working path
-                        break
-                    out.release()
-                except:
-                    continue
-            
-            if out is None or not out.isOpened():
-                # Final fallback
-                fourcc = cv2.VideoWriter_fourcc(*'XVID')
-                output_path = os.path.splitext(output_path)[0] + '.avi'
-                out = cv2.VideoWriter(output_path, fourcc, out_fps, (width, height))
+            out_fps = max(fps / self.frame_skip, 1.0)
+            output_path = os.path.splitext(output_path)[0] + '.mp4'
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(output_path, fourcc, out_fps, (width, height))
         
         # Process frames
         frame_results = []
@@ -207,8 +185,11 @@ class StreamProcessor:
             cap.release()
             if out:
                 out.release()
+                # Re-encode to H.264 so the video plays in every browser
+                from utils.video_utils import reencode_for_browser
+                output_path = reencode_for_browser(output_path)
             self.is_processing = False
-        
+
         # Calculate aggregated stats
         total_time = time.time() - start_time
         effective_fps = processed_count / total_time if total_time > 0 else 0

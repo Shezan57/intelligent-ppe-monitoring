@@ -33,10 +33,11 @@ DB_SCHEMA = """
 You have access to an SQLite database with these tables:
 
 TABLE: violations
+  (written by the image/basic-video detection endpoint)
 - id (INTEGER, primary key)
 - timestamp (DATETIME) — when violation was detected
 - site_location (VARCHAR) — e.g. 'Construction Site A'
-- camera_id (VARCHAR) — e.g. 'CAM-001'
+- camera_id (VARCHAR) — e.g. 'CAM-001'          ← column is camera_id
 - has_helmet (BOOLEAN) — True if helmet present
 - has_vest (BOOLEAN) — True if vest present
 - violation_type (VARCHAR) — 'no_helmet', 'no_vest', or 'both_missing'
@@ -49,15 +50,19 @@ TABLE: violations
 - total_duration_minutes (FLOAT) — total violation duration
 
 TABLE: verified_violations
+  (written by the Sentry-Judge pipeline — the primary demo workflow)
 - id (INTEGER, primary key)
 - timestamp (DATETIME) — when verified
 - person_id (INTEGER) — tracked person ID
-- camera_zone (VARCHAR) — e.g. 'zone_1'
+- camera_zone (VARCHAR) — e.g. 'CAM-001'        ← column is camera_zone (NOT camera_id)
 - violation_type (VARCHAR) — 'no_helmet', 'no_vest', 'both_missing'
 - judge_confirmed (BOOLEAN) — True if SAM Judge confirmed
-- judge_confidence (FLOAT) — SAM confidence score
-- sentry_confidence (FLOAT) — YOLO confidence score
-- decision_path (VARCHAR)
+- judge_confidence (FLOAT) — SAM Judge confidence score (0.0–1.0)
+- judge_processing_time_ms (FLOAT) — SAM processing time in ms
+- sentry_confidence (FLOAT) — YOLO Sentry confidence score (0.0–1.0)
+- decision_path (VARCHAR) — which triage path was used
+- image_path (VARCHAR) — path to ROI crop image
+- report_sent (BOOLEAN) — True if included in daily report
 
 TABLE: daily_reports
 - id (INTEGER, primary key)
@@ -66,6 +71,12 @@ TABLE: daily_reports
 - total_violations (INTEGER)
 - compliance_rate (FLOAT) — percentage
 - email_sent (BOOLEAN)
+
+CRITICAL COLUMN DIFFERENCES:
+- violations uses "camera_id";  verified_violations uses "camera_zone" (same concept, different name)
+- violations uses "detection_confidence";  verified_violations uses "sentry_confidence" (same concept)
+- violations uses "processing_time_ms";  verified_violations uses "judge_processing_time_ms"
+- verified_violations has "person_id" and "judge_confidence"; violations does not
 """
 
 SYSTEM_PROMPT = f"""You are a PPE Safety Compliance Assistant for a construction site monitoring system.
@@ -86,15 +97,25 @@ RULES:
 9. If the question cannot be answered from the database, say so politely.
 10. IMPORTANT — Table usage:
     - The system has TWO violation tables:
-      * "violations" — written by the image/basic-video detection endpoint
+      * "violations"          — written by the image/basic-video detection endpoint
       * "verified_violations" — written by the Sentry-Judge pipeline (the main demo workflow)
-    - When counting or listing violations, ALWAYS query BOTH tables and SUM the results.
-      Example for total today:
-        SELECT (SELECT COUNT(*) FROM violations WHERE date(timestamp)=date('now','localtime'))
-             + (SELECT COUNT(*) FROM verified_violations WHERE date(timestamp)=date('now','localtime'))
+    - When counting violations, ALWAYS query BOTH tables and SUM:
+        SELECT (SELECT COUNT(*) FROM violations WHERE date(timestamp,'localtime')=date('now','localtime'))
+             + (SELECT COUNT(*) FROM verified_violations WHERE date(timestamp,'localtime')=date('now','localtime'))
              AS total_violations
-    - Use verified_violations for questions about SAM confidence, judge confirmation, person_id, camera_zone.
-    - Use violations for questions about site_location, camera_id, sam_activated, detection_confidence.
+    - UNION aliasing rule: when you UNION the two tables you MUST alias the differing columns so both
+      sides use the same name.  CORRECT example for camera breakdown:
+        SELECT camera, COUNT(*) AS violation_count
+        FROM (
+            SELECT camera_id       AS camera, violation_type FROM violations
+            UNION ALL
+            SELECT camera_zone     AS camera, violation_type FROM verified_violations
+        )
+        GROUP BY camera ORDER BY violation_count DESC
+      NEVER write "SELECT camera_id FROM violations UNION ALL SELECT camera_id FROM verified_violations"
+      because verified_violations has NO column called camera_id — it uses camera_zone.
+    - Use verified_violations for: judge_confidence, judge_processing_time_ms, person_id, camera_zone, sentry_confidence.
+    - Use violations for: site_location, camera_id, sam_activated, detection_confidence, processing_time_ms.
 
 Respond with JSON in this exact format:
 {{

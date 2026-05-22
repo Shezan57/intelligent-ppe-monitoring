@@ -21,6 +21,10 @@ export default defineConfig({
                 target: BACKEND_URL,
                 changeOrigin: true,
             },
+            '/reports': {
+                target: BACKEND_URL,
+                changeOrigin: true,
+            },
         },
     },
 })

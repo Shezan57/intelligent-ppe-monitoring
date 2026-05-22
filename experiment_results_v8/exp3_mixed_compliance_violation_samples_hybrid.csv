@@ -1,0 +1,31 @@
+filename,frame,track_id,violation_type,path,yolo_conf,manual_label,manual_reason
+frame00002_id1_both_missing.jpg ,2,1,both_missing,Critical,0.509337783,TP,this image is dark but the human eye see the  person bearly
+frame00002_id2_no_vest.jpg,2,2,no_vest,Rescue Body,0.574342787,TP,this image is dark but the human eye see the  person bearly
+frame00002_id3_no_helmet.jpg,2,3,no_helmet,Critical,0.523973167,FP,"this image is dark but the human eye see the  person bearly, this person wearing helmet missing vest"
+frame00002_id10_no_vest.jpg,2,10,no_vest,Rescue Body,0.333997846,TP,this image is dark but the human eye see the  person bearly
+frame00004_id1_no_vest.jpg,4,1,no_vest,Rescue Body,0.550768197,FP,this is the same person frame00002_id1_both_missing.jpg 
+frame00004_id14_no_vest.jpg,4,14,no_vest,Rescue Body,0.459206939,FP,"this image is dark but the human eye see the  person bearly, this woman wearing a hat (not a helmet,)its true she doesn't have vest."
+frame00004_id21_no_vest.jpg,4,21,no_vest,Rescue Body,0.572449923,TP,this image is dark but the human eye see the  person bearly
+frame00006_id6_no_vest.jpg,6,6,no_vest,Rescue Body,0.547399819,TP,this image is dark but the human eye see the  person bearly
+frame00014_id29_no_vest.jpg,14,29,no_vest,Rescue Body,0.34155193,TP,Here I can see two people. One covering another but both has helmet
+frame00014_id14_both_missing.jpg,14,14,both_missing,Critical,0.331996441,FP,"this is the same person frame00004_id14_no_vest.jpg, I saw this woman's hat's upper side is like a white helmet. "
+frame00020_id32_no_helmet.jpg,20,32,no_helmet,Critical,0.456417829,FP,both are missing
+frame00030_id21_both_missing.jpg,30,21,both_missing,Critical,0.370898485,FP,"infront of this man there is a barrier, but he has a helmet"
+frame00036_id4_no_helmet.jpg,36,4,no_helmet,Rescue Head,0.492277771,FP,He has everythin but one dress type all are yollow colour
+frame00038_id41_no_vest.jpg,38,41,no_vest,Rescue Body,0.483105421,TP,
+frame00052_id32_both_missing.jpg,52,32,both_missing,Critical,0.422645539,TP,
+frame00054_id32_no_vest.jpg,54,32,no_vest,Critical,0.340079695,TP,
+frame00058_id45_no_vest.jpg,58,45,no_vest,Critical,0.540064096,TP,
+frame00064_id46_no_vest.jpg,64,46,no_vest,Rescue Body,0.616516769,TP,
+frame00064_id49_no_vest.jpg,64,49,no_vest,Rescue Body,0.502125978,TP,
+frame00098_id55_no_vest.jpg,98,55,no_vest,Critical,0.329430073,TP,
+frame00114_id55_both_missing.jpg,114,55,both_missing,Critical,0.483058602,TP,
+frame00118_id60_no_vest.jpg,118,60,no_vest,Rescue Body,0.40348801,TP,
+frame00152_id1_both_missing.jpg,152,1,both_missing,Critical,0.76623106,TP,
+frame00160_id3_no_vest.jpg,160,3,no_vest,Rescue Body,0.634509623,TP,
+frame00164_id14_both_missing.jpg,164,14,both_missing,Critical,0.460714579,TP,That woman
+frame00170_id14_no_vest.jpg,170,14,no_vest,Rescue Body,0.47494179,TP,That woman
+frame00176_id75_no_vest.jpg,176,75,no_vest,Rescue Body,0.490822256,TP,
+frame00184_id78_no_helmet.jpg,184,78,no_helmet,Rescue Head,0.311309785,FP,the same person frame00036_id4_no_helmet.jpg
+frame00186_id79_no_vest.jpg,186,79,no_vest,Rescue Body,0.371642709,TP,
+frame00188_id41_no_vest.jpg,188,41,no_vest,Rescue Body,0.502486885,TP,

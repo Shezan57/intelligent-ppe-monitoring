@@ -29,7 +29,7 @@ const Header = ({ onSettingsClick }) => {
                     background: 'var(--bg-tertiary)',
                     borderRadius: 'var(--radius-md)'
                 }}>
-                    🎓 Master's Thesis Project
+                    🎓 Undergraduate Thesis Project
                 </span>
                 <button
                     className="btn btn--secondary"

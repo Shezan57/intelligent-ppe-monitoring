@@ -1,5 +1,5 @@
 # PPE Detection Thesis Project - Complete Technical Specification
-## Master's Graduation Thesis Project with Automated Reporting
+## Undergraduate Thesis Project with Automated Reporting
 
 **Document Purpose:** Comprehensive specification for building a complete PPE (Personal Protective Equipment) violation detection system with AUTOMATED DAILY REPORTING to managers. Contains ALL technical details needed for implementation.
 
@@ -11,7 +11,7 @@
 **"Intelligent PPE Compliance Monitoring: A Hybrid Deep Learning Framework with Semantic Verification for Construction Safety"**
 
 ### Academic Level
-- **Degree:** Master's (Graduation Thesis)
+- **Degree:** Bachelor's (Undergraduate Thesis)
 - **Field:** Computer Science / AI / Computer Vision
 - **Critical Importance:** KEY project for graduation
 

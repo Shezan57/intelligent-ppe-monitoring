@@ -1,6 +1,6 @@
 # Intelligent PPE Compliance Monitoring System
 
-**Master's Thesis Project** - Hybrid Deep Learning Framework with Semantic Verification for Construction Safety
+**Undergraduate Thesis Project** - Hybrid Deep Learning Framework with Semantic Verification for Construction Safety
 
 ## 🎯 Overview
 
@@ -86,4 +86,4 @@ Access at: http://localhost:5173
 
 ---
 
-*Built for Master's Graduation Thesis | 2026*
+*Built for Undergraduate Thesis | 2026*

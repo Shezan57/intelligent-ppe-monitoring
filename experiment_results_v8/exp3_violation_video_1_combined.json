@@ -1,0 +1,61 @@
+{
+  "video": "violation_video_1.mp4",
+  "native_fps": 25.0,
+  "frames_in_video": 212,
+  "frames_processed": 212,
+  "frames_with_persons": 72,
+  "stride": 2,
+  "max_frames_cap": 600,
+  "yolo_conf": 0.3,
+  "imgsz": 640,
+  "sam_threshold_used": 0.05,
+  "cooldown_frames": 150,
+  "yolo_only": {
+    "condition": "yolo_only",
+    "frames_processed": 212,
+    "frames_with_persons": 72,
+    "total_persons_evaluated": 161,
+    "path_distribution": {
+      "Critical (no SAM)": 160,
+      "Rescue Body (no SAM)": 1
+    },
+    "sam_calls": 0,
+    "sam_invocation_rate_pct": 0.0,
+    "bypass_rate_pct": 100.0,
+    "raw_violation_events": 161,
+    "confirmed_violations_after_cooldown": 12,
+    "deduplication_pct": 92.54658385093167,
+    "mean_ms_per_frame": 0.0020433788650606305,
+    "mean_fps": 489385.50608446676,
+    "total_processing_time_sec": 162.0300555229187,
+    "samples_dir": "/content/experiment_results_v8/exp3_violation_video_1_samples_yolo_only",
+    "samples_csv": "/content/experiment_results_v8/exp3_violation_video_1_violation_samples_yolo_only.csv",
+    "n_samples_saved": 12
+  },
+  "hybrid": {
+    "condition": "hybrid",
+    "frames_processed": 212,
+    "frames_with_persons": 72,
+    "total_persons_evaluated": 161,
+    "path_distribution": {
+      "Critical": 160,
+      "Rescue Body": 1
+    },
+    "sam_calls": 321,
+    "sam_invocation_rate_pct": 199.37888198757764,
+    "bypass_rate_pct": -99.37888198757764,
+    "raw_violation_events": 160,
+    "confirmed_violations_after_cooldown": 15,
+    "deduplication_pct": 90.625,
+    "mean_ms_per_frame": 762.1011616993535,
+    "mean_fps": 1.3121617578566254,
+    "total_processing_time_sec": 162.0300555229187,
+    "samples_dir": "/content/experiment_results_v8/exp3_violation_video_1_samples_hybrid",
+    "samples_csv": "/content/experiment_results_v8/exp3_violation_video_1_violation_samples_hybrid.csv",
+    "n_samples_saved": 15
+  },
+  "sam_call_count_total": 321,
+  "sam_total_ms": 124185.68181991577,
+  "sam_mean_ms_per_call": 386.87128292808654,
+  "wall_clock_seconds": 162.0300555229187
+}

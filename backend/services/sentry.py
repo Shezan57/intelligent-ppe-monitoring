@@ -179,6 +179,9 @@ class Sentry:
         cap.release()
         if out_writer:
             out_writer.release()
+            # Re-encode to H.264 so the video plays in browsers
+            from utils.video_utils import reencode_for_browser
+            output_path = reencode_for_browser(output_path)
 
         total_time = time.time() - t_start
 

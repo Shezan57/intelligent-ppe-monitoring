@@ -1,0 +1,13 @@
+filename,frame,track_id,violation_type,path,yolo_conf,manual_label,manual_reason
+frame00000_id1_both_missing.jpg,0,1,both_missing,Critical (no SAM),0.607004881,TP,
+frame00000_id2_both_missing.jpg,0,2,both_missing,Critical (no SAM),0.500137568,TP,
+frame00000_id3_both_missing.jpg,0,3,both_missing,Critical (no SAM),0.371184826,TP,
+frame00000_id5_both_missing.jpg,0,5,both_missing,Critical (no SAM),0.302064866,TP,
+frame00002_id6_both_missing.jpg,2,6,both_missing,Critical (no SAM),0.34956345,TP,
+frame00010_id7_both_missing.jpg,10,7,both_missing,Critical (no SAM),0.326146394,FP,this is a machine false detection as a person
+frame00114_id24_both_missing.jpg,114,24,both_missing,Critical (no SAM),0.455185354,TP,
+frame00126_id31_both_missing.jpg,126,31,both_missing,Critical (no SAM),0.362925112,TP,
+frame00128_id32_both_missing.jpg,128,32,both_missing,Critical (no SAM),0.38875556,TP,
+frame00130_id31_no_vest.jpg,130,31,no_vest,Rescue Body (no SAM),0.438578665,FP,both are missing and wearing cap made of scarf
+frame00150_id2_both_missing.jpg,150,2,both_missing,Critical (no SAM),0.57193917,TP,
+frame00168_id38_both_missing.jpg,168,38,both_missing,Critical (no SAM),0.356356859,TP,
