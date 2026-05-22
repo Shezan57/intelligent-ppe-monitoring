@@ -282,6 +282,7 @@ class SAMVerifier:
         self,
         roi_crop: np.ndarray,
         violation_type: str,
+        vest_threshold: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Verify PPE presence on an already-cropped FULL person ROI.
@@ -334,7 +335,9 @@ class SAMVerifier:
             if self._use_mock:
                 result = self._mock_verification("vest")
             else:
-                result = self._run_sam3_verification(roi_crop, VEST_PROMPTS, "vest")
+                v_thresh = vest_threshold if vest_threshold is not None else self.mask_threshold
+                result = self._run_sam3_verification(roi_crop, VEST_PROMPTS, "vest",
+                                                      threshold_override=v_thresh)
             vest_found = result.get("vest_found", False)
             vest_conf = result.get("confidence", 0.0)
             self._stats["total_verifications"] += 1
@@ -430,7 +433,8 @@ class SAMVerifier:
         self,
         roi_crop: np.ndarray,
         prompts: List[str],
-        item_type: str
+        item_type: str,
+        threshold_override: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Run SAM 3 concept segmentation on cropped ROI.
@@ -482,12 +486,13 @@ class SAMVerifier:
                 coverage = float(np.sum(mask_bin)) / float(mask_bin.size)
                 max_coverage = max(max_coverage, coverage)
 
-            # Check against threshold
-            found = max_coverage > self.mask_threshold
+            # Check against threshold (caller can override for vest sensitivity)
+            thresh = threshold_override if threshold_override is not None else self.mask_threshold
+            found = max_coverage > thresh
 
             print(
                 f"  SAM3 {item_type}: coverage={max_coverage:.4f} "
-                f"(thresh={self.mask_threshold}) → {'FOUND ✅' if found else 'MISS ❌'} "
+                f"(thresh={thresh}) → {'FOUND ✅' if found else 'MISS ❌'} "
                 f"crop={w}x{h}"
             )
 

@@ -247,22 +247,28 @@ class Judge:
             return (not helmet_found, confidence)
 
         elif violation_type == "no_vest":
-            result = self.sam.verify_ppe_on_crop(torso_crop, "no_vest")
+            # Vest threshold is much lower than helmet — SAM vest recall is
+            # poor (~43%) so even a faint signal (coverage > 0.002) counts.
+            result = self.sam.verify_ppe_on_crop(torso_crop, "no_vest",
+                                                  vest_threshold=0.002)
             vest_found = result.get("vest_found", False)
             confidence = result.get("vest_confidence", 0.0)
             return (not vest_found, confidence)
 
         elif violation_type == "both_missing":
             helmet_result = self.sam.verify_ppe_on_crop(head_crop, "no_helmet")
-            vest_result   = self.sam.verify_ppe_on_crop(torso_crop, "no_vest")
+            vest_result   = self.sam.verify_ppe_on_crop(torso_crop, "no_vest",
+                                                         vest_threshold=0.002)
             helmet_found = helmet_result.get("helmet_found", False)
             vest_found   = vest_result.get("vest_found", False)
             avg_conf = (
                 helmet_result.get("helmet_confidence", 0.0) +
                 vest_result.get("vest_confidence", 0.0)
             ) / 2
-            # Confirmed if at least one item is still missing
-            confirmed = not (helmet_found and vest_found)
+            # Only confirm if BOTH items are truly missing.
+            # If SAM finds a helmet, vest detection is unreliable at this
+            # angle/distance — reject to avoid false "both_missing" flags.
+            confirmed = not helmet_found and not vest_found
             return (confirmed, avg_conf)
 
         # Unknown type → confirm by default
